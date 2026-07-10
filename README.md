@@ -1,2 +1,3 @@
-***TITLE***
-*TEST*
+# Trade partner intelligence for growth and diversification #
+
+The location of a country within a network of trade agreements has been found to affect the depth and breadth of its economic capabilities, and the app developed here implements that insight for policy-makers. Fan Z etal (2025) found that when a country [insert], the complexity of its good output can [insert]. The app adopts the framework of Fan Z etal (2025), with developments for usability and policy relevance. 
