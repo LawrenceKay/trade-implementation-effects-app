@@ -90,7 +90,6 @@ Services available:
 | `centrality_pipeline.py` | Computes FTA eigenvector centrality following Fan et al. (2025); reads `desta_dyads.csv`, outputs `centrality_scores.csv` | Working |
 | `pipeline.py` | World Bank data pipeline (governance indicators) | Working |
 | `score.py` | Institutional quality scoring | Working |
-| `app.py` | Original Streamlit app (choropleth map + scoring) | Working |
 
 Run the network app:
 ```bash
