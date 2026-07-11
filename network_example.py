@@ -24,6 +24,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
+from dotenv import load_dotenv
+
+# Local dev only — no-ops if the file doesn't exist (e.g. on Streamlit Community Cloud,
+# which supplies ANTHROPIC_API_KEY via st.secrets instead; see api_key lookup below).
+load_dotenv(os.path.expanduser("~/Agents/trade_implementation_effects_app/.env"))
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE CONFIG
@@ -1127,6 +1132,14 @@ def render_home():
         '<div class="page-title">Trade partner intelligence for growth and diversification</div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div style="font-size:15px;color:#666;margin-top:2px;">'
+        'Countries that place themselves in networks of trade agreements that contain deep and sophisticated '
+        'production capabilities are likely to grow faster. Use the app to learn how your countries of '
+        'interest can do so.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.divider()
 
     sel_name = COUNTRY_LOOKUP[sel]["name"] if sel in COUNTRY_LOOKUP else (sel or "")
@@ -1224,11 +1237,11 @@ def render_home():
     st.markdown(
         f'<p style="font-size:15px;font-weight:700;color:{COLOR_GREEN};'
         f'text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px 2px;">'
-        f'Select country</p>',
+        f'Country selection</p>',
         unsafe_allow_html=True,
     )
     _chosen_name = st.selectbox(
-        "Select country",
+        "Country selection",
         options=_all_names,
         index=cur_idx,
         placeholder="Choose a country…",
@@ -1268,6 +1281,148 @@ def render_home():
     _all_cent2b = [v for v in _centrality_index.values() if v > 0]
     _cmax2b     = max(_all_cent2b) if _all_cent2b else 1.0
     _sum_cent   = round((_centrality_index.get(sel, 0) / _cmax2b) * 100, 1) if sel and _centrality_index.get(sel) else None
+
+    # ── Country analysis + Discuss trade strategy (equal columns) ────────────
+    col_analysis, col_strategy = st.columns(2, gap="small")
+
+    with col_analysis:
+        if sel:
+            _n_agrs = len(_sum_agrs)
+            _agr_s  = "" if _n_agrs == 1 else "s"
+
+            # Depth qualifier
+            if depth_pct2 is None:
+                _depth_qual = ""
+            elif depth_pct2 >= 60:
+                _depth_qual = ", mostly of high agreement depth"
+            elif depth_pct2 >= 30:
+                _depth_qual = ", mostly of moderate agreement depth"
+            else:
+                _depth_qual = ", mostly of low agreement depth"
+
+            # Centrality qualifier
+            if _sum_cent is None:
+                _cent_qual = "Its centrality in the global network of trade agreements is not available."
+            elif _sum_cent >= 60:
+                _cent_qual = f"It has high centrality in the global network of trade agreements, ranking among the most connected countries."
+            elif _sum_cent >= 25:
+                _cent_qual = f"It has moderate centrality in the global network of trade agreements, comparable to mid-tier trading nations."
+            else:
+                _cent_qual = f"It has low centrality in its network of trade agreements, compared to leading countries."
+
+            # Complexity additionality qualifier
+            if _avg_peci is None:
+                _peci_qual = "Complexity additionality data is not available."
+            elif _avg_peci == 0.0:
+                _peci_qual = f"None of {sel_name}'s current trade partners are more economically complex, so existing agreements provide no complexity additionality."
+            elif _avg_peci >= 0.8:
+                _peci_qual = f"Exposure to more complex trade partners provides high complexity additionality (score: {_avg_peci:.2f}), with strong potential for knowledge transfer and upgrading."
+            elif _avg_peci >= 0.3:
+                _peci_qual = f"Exposure to more complex trade partners provides moderate complexity additionality (score: {_avg_peci:.2f})."
+            else:
+                _peci_qual = f"Exposure to more complex trade partners provides limited complexity additionality (score: {_avg_peci:.2f})."
+
+            _agr_sent  = f"{sel_name} has {_n_agrs} FTA{_agr_s} on record{_depth_qual}."
+            _cent_sent = _cent_qual
+            _peci_sent = _peci_qual
+
+            st.markdown(
+                f'<div style="margin-top:12px;padding:14px 16px;border:1px solid #e0e4ea;'
+                f'border-radius:8px;background:white;">'
+                f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
+                f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'
+                f'Country analysis</div>'
+                f'<div style="font-size:17px;color:#333;line-height:1.8;">'
+                f'{_html.escape(_agr_sent)} '
+                f'{_html.escape(_cent_sent)} '
+                f'{_html.escape(_peci_sent)}'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
+                f'border-radius:8px;border:1px solid #e0e4ea;font-size:12px;color:#999;">'
+                f'Select a country to see its analysis.</div>',
+                unsafe_allow_html=True,
+            )
+
+    with col_strategy:
+        if sel:
+            # Clear history if user has switched country
+            if st.session_state["economist_country"] != sel:
+                st.session_state["economist_messages"] = []
+                st.session_state["economist_country"]  = sel
+
+            st.markdown(
+                f'<div style="margin-top:12px;font-size:15px;font-weight:700;'
+                f'color:{COLOR_BLUE};text-transform:uppercase;letter-spacing:.05em;">'
+                f'Discuss trade strategy</div>',
+                unsafe_allow_html=True,
+            )
+
+            for _msg in st.session_state["economist_messages"]:
+                _is_user = _msg["role"] == "user"
+                _bg   = "#f0f7f2" if not _is_user else "#f0f4fa"
+                _col  = COLOR_GREEN if not _is_user else COLOR_BLUE
+                _lbl  = "Trade economist" if not _is_user else "You"
+                st.markdown(
+                    f'<div style="margin-top:6px;padding:10px 14px;border-radius:8px;'
+                    f'background:{_bg};border-left:3px solid {_col};">'
+                    f'<div style="font-size:10px;font-weight:700;color:{_col};'
+                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">'
+                    f'{_lbl}</div>'
+                    f'<div style="font-size:13px;color:#222;line-height:1.6;">'
+                    f'{_html.escape(_msg["content"]).replace(chr(10), "<br>")}'
+                    f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+            _user_input = st.chat_input(
+                "Ask about trade strategy…",
+                key="economist_input",
+            )
+
+            if _user_input and sel:
+                st.session_state["economist_messages"].append(
+                    {"role": "user", "content": _user_input}
+                )
+                _sys_prompt = (
+                    f"You are a trade economist advising on {sel_name}'s trade strategy. "
+                    f"Answer concisely and cite evidence where possible.\n\n"
+                    f"Country profile:\n"
+                    f"- FTA agreements on record: {len(_sum_agrs)}\n"
+                    f"- Network centrality: {_sum_cent} / 100\n"
+                    f"- Agreement depth (proxy): {round(min(_avg_depth / 47 * 100, 100), 1) if _avg_depth else 'not available'} / 100\n"
+                    f"- ECI: {f'{_sum_eci:+.2f}' if _sum_eci is not None else 'not available'}"
+                    + (f" (rank {_sum_rank} of {_sum_total})" if _sum_rank else "") + "\n"
+                    f"- Complexity additionality: {f'{_avg_peci:.2f}' if _avg_peci is not None else 'not available'}\n"
+                    f"- Integration profile: {_type_label}, {_cx_label}\n\n"
+                    f"Do not fabricate statistics. Label your response as AI-generated analysis."
+                )
+                try:
+                    _api_key = os.environ.get("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY")
+                    _client = anthropic.Anthropic(api_key=_api_key)
+                    _resp = _client.messages.create(
+                        model="claude-opus-4-7",
+                        max_tokens=1500,
+                        system=_sys_prompt,
+                        messages=st.session_state["economist_messages"],
+                    )
+                    _reply = _resp.content[0].text
+                except Exception as _e:
+                    _reply = f"Error: {_e}"
+                st.session_state["economist_messages"].append(
+                    {"role": "assistant", "content": _reply}
+                )
+                st.rerun()
+        else:
+            st.markdown(
+                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
+                f'border-radius:8px;border:1px solid #e0e4ea;font-size:12px;color:#999;">'
+                f'Select a country to discuss trade strategy.</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── Two-column layout: globe (left) + group selector (right) ─────────────
     col_globe_main, col_grp = st.columns([3, 2], gap="small")
@@ -1350,137 +1505,6 @@ def render_home():
                 f'border-radius:8px;border:1px solid #e0e4ea;font-size:13px;color:#999;">'
                 f'Select countries above to assess them as potential trade partners. '
                 f'The scores below will update as you add or remove countries.</div>',
-                unsafe_allow_html=True,
-            )
-
-        # ── Country summary box ───────────────────────────────────────────────
-        if sel:
-            _n_agrs = len(_sum_agrs)
-            _agr_s  = "" if _n_agrs == 1 else "s"
-
-            # Depth qualifier
-            if depth_pct2 is None:
-                _depth_qual = ""
-            elif depth_pct2 >= 60:
-                _depth_qual = ", mostly of high agreement depth"
-            elif depth_pct2 >= 30:
-                _depth_qual = ", mostly of moderate agreement depth"
-            else:
-                _depth_qual = ", mostly of low agreement depth"
-
-            # Centrality qualifier
-            if _sum_cent is None:
-                _cent_qual = "Its centrality in the global network of trade agreements is not available."
-            elif _sum_cent >= 60:
-                _cent_qual = f"It has high centrality in the global network of trade agreements, ranking among the most connected countries."
-            elif _sum_cent >= 25:
-                _cent_qual = f"It has moderate centrality in the global network of trade agreements, comparable to mid-tier trading nations."
-            else:
-                _cent_qual = f"It has low centrality in its network of trade agreements, compared to leading countries."
-
-            # Complexity additionality qualifier
-            if _avg_peci is None:
-                _peci_qual = "Complexity additionality data is not available."
-            elif _avg_peci == 0.0:
-                _peci_qual = f"None of {sel_name}'s current trade partners are more economically complex, so existing agreements provide no complexity additionality."
-            elif _avg_peci >= 0.8:
-                _peci_qual = f"Exposure to more complex trade partners provides high complexity additionality (score: {_avg_peci:.2f}), with strong potential for knowledge transfer and upgrading."
-            elif _avg_peci >= 0.3:
-                _peci_qual = f"Exposure to more complex trade partners provides moderate complexity additionality (score: {_avg_peci:.2f})."
-            else:
-                _peci_qual = f"Exposure to more complex trade partners provides limited complexity additionality (score: {_avg_peci:.2f})."
-
-            _agr_sent  = f"{sel_name} has {_n_agrs} FTA{_agr_s} on record{_depth_qual}."
-            _cent_sent = _cent_qual
-            _peci_sent = _peci_qual
-
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;border:1px solid #e0e4ea;'
-                f'border-radius:8px;background:white;">'
-                f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
-                f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'
-                f'Country analysis</div>'
-                f'<div style="font-size:17px;color:#333;line-height:1.8;">'
-                f'{_html.escape(_agr_sent)} '
-                f'{_html.escape(_cent_sent)} '
-                f'{_html.escape(_peci_sent)}'
-                f'</div></div>',
-                unsafe_allow_html=True,
-            )
-
-            # ── Trade economist chat ──────────────────────────────────────────
-            # Clear history if user has switched country
-            if st.session_state["economist_country"] != sel:
-                st.session_state["economist_messages"] = []
-                st.session_state["economist_country"]  = sel
-
-            st.markdown(
-                f'<div style="margin-top:12px;font-size:15px;font-weight:700;'
-                f'color:{COLOR_BLUE};text-transform:uppercase;letter-spacing:.05em;">'
-                f'Discuss trade strategy</div>',
-                unsafe_allow_html=True,
-            )
-
-            for _msg in st.session_state["economist_messages"]:
-                _is_user = _msg["role"] == "user"
-                _bg   = "#f0f7f2" if not _is_user else "#f0f4fa"
-                _col  = COLOR_GREEN if not _is_user else COLOR_BLUE
-                _lbl  = "Trade economist" if not _is_user else "You"
-                st.markdown(
-                    f'<div style="margin-top:6px;padding:10px 14px;border-radius:8px;'
-                    f'background:{_bg};border-left:3px solid {_col};">'
-                    f'<div style="font-size:10px;font-weight:700;color:{_col};'
-                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">'
-                    f'{_lbl}</div>'
-                    f'<div style="font-size:13px;color:#222;line-height:1.6;">'
-                    f'{_html.escape(_msg["content"]).replace(chr(10), "<br>")}'
-                    f'</div></div>',
-                    unsafe_allow_html=True,
-                )
-
-            _user_input = st.chat_input(
-                "Ask about trade strategy…",
-                key="economist_input",
-            )
-
-            if _user_input and sel:
-                st.session_state["economist_messages"].append(
-                    {"role": "user", "content": _user_input}
-                )
-                _sys_prompt = (
-                    f"You are a trade economist advising on {sel_name}'s trade strategy. "
-                    f"Answer concisely and cite evidence where possible.\n\n"
-                    f"Country profile:\n"
-                    f"- FTA agreements on record: {len(_sum_agrs)}\n"
-                    f"- Network centrality: {_sum_cent} / 100\n"
-                    f"- Agreement depth (proxy): {round(min(_avg_depth / 47 * 100, 100), 1) if _avg_depth else 'not available'} / 100\n"
-                    f"- ECI: {f'{_sum_eci:+.2f}' if _sum_eci is not None else 'not available'}"
-                    + (f" (rank {_sum_rank} of {_sum_total})" if _sum_rank else "") + "\n"
-                    f"- Complexity additionality: {f'{_avg_peci:.2f}' if _avg_peci is not None else 'not available'}\n"
-                    f"- Integration profile: {_type_label}, {_cx_label}\n\n"
-                    f"Do not fabricate statistics. Label your response as AI-generated analysis."
-                )
-                try:
-                    _client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-                    _resp = _client.messages.create(
-                        model="claude-opus-4-7",
-                        max_tokens=1500,
-                        system=_sys_prompt,
-                        messages=st.session_state["economist_messages"],
-                    )
-                    _reply = _resp.content[0].text
-                except Exception as _e:
-                    _reply = f"Error: {_e}"
-                st.session_state["economist_messages"].append(
-                    {"role": "assistant", "content": _reply}
-                )
-                st.rerun()
-
-        else:
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
-                f'border-radius:8px;border:1px solid #e0e4ea;font-size:12px;color:#999;">'
-                f'Select a country to see a summary.</div>',
                 unsafe_allow_html=True,
             )
 
