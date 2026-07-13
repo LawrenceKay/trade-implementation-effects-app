@@ -18,17 +18,11 @@ import random
 import statistics
 from pathlib import Path
 
-import anthropic
 import networkx as nx
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
-from dotenv import load_dotenv
-
-# Local dev only — no-ops if the file doesn't exist (e.g. on Streamlit Community Cloud,
-# which supplies ANTHROPIC_API_KEY via st.secrets instead; see api_key lookup below).
-load_dotenv(os.path.expanduser("~/Agents/trade_implementation_effects_app/.env"))
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE CONFIG
@@ -37,7 +31,7 @@ load_dotenv(os.path.expanduser("~/Agents/trade_implementation_effects_app/.env")
 st.set_page_config(
     page_title="Trade Partner Intelligence for Growth and Diversification",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -60,6 +54,7 @@ st.markdown(f"""
   /* ── Global ──────────────────────────────────────────────────────────────── */
   header[data-testid="stHeader"], [data-testid="stHeader"] {{ display:none !important; }}
   .stAppDeployButton {{ display:none !important; }}
+  [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display:none !important; }}
   .stApp, [data-testid="stAppViewContainer"],
   [data-testid="stAppViewBlockContainer"], .main,
   .block-container {{ background-color:#ffffff !important; }}
@@ -255,7 +250,9 @@ st.markdown(f"""
   }}
 
   /* ── Analysis page country heading selectbox — green banner ─────────────── */
-  .block-container [data-baseweb="select"] > div {{
+  /* Scoped to stSelectbox only — stMultiSelect (Assess a group) keeps normal   */
+  /* sizing, since giant text made its dropdown hard to browse/add from.       */
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
     font-size: 28px !important;
     font-weight: 700 !important;
     min-height: 56px !important;
@@ -265,26 +262,35 @@ st.markdown(f"""
     background-color: {COLOR_GREEN} !important;
     padding-left: 14px !important;
   }}
-  .block-container [data-baseweb="select"] [data-baseweb="select-value"],
-  .block-container [data-baseweb="select"] [data-baseweb="select-value"] * {{
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value"],
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value"] * {{
     font-size: 28px !important;
     font-weight: 700 !important;
     color: white !important;
   }}
-  .block-container [data-baseweb="select"] [data-baseweb="select-placeholder"] {{
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-placeholder"] {{
     font-size: 28px !important;
     font-weight: 700 !important;
     color: rgba(255,255,255,0.7) !important;
   }}
-  .block-container [data-baseweb="select"] input {{
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] input {{
     font-size: 28px !important;
     font-weight: 700 !important;
     color: white !important;
   }}
-  .block-container [data-baseweb="select"] svg {{
+  .block-container [data-testid="stSelectbox"] [data-baseweb="select"] svg {{
     width: 22px !important;
     height: 22px !important;
     fill: white !important;
+  }}
+
+  /* ── Assess a group multiselect — compact, easy to browse and add from ────── */
+  .block-container [data-testid="stMultiSelect"] [data-baseweb="select"] > div {{
+    min-height: 38px !important;
+    border-color: {COLOR_GREEN} !important;
+  }}
+  .block-container [data-testid="stMultiSelect"] [data-baseweb="select"] input {{
+    font-size: 14px !important;
   }}
 
   /* ── Data note ───────────────────────────────────────────────────────────── */
@@ -729,6 +735,7 @@ COUNTRIES = [
 ]
 
 COUNTRY_LOOKUP = {c["iso3"]: c for c in COUNTRIES}
+NAME_TO_REGION_COLOR = {c["name"]: WB_REGIONS[c["region"]] for c in COUNTRIES}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA GENERATION (DTA illustrative values)
@@ -792,23 +799,6 @@ if "country"        not in st.session_state: st.session_state["country"]        
 if "metric"         not in st.session_state: st.session_state["metric"]         = "Centrality"
 if "country_group"  not in st.session_state: st.session_state["country_group"]  = []
 if "strategy_text"  not in st.session_state: st.session_state["strategy_text"]  = None
-if "economist_messages" not in st.session_state: st.session_state["economist_messages"] = []
-if "economist_country"  not in st.session_state: st.session_state["economist_country"]  = None
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════════════════════════
-
-SECTIONS = {
-    "centrality": {
-        "title": "Trade agreement network centrality",
-        "desc":  "How well-connected is a country within the global network of free trade agreements? Countries that are central — linked to many well-connected partners through deep agreements — gain access to more diverse knowledge, technology, and trade flows.",
-    },
-}
-
-with st.sidebar:
-    st.divider()
-
 
 # JS: style selectbox control + watch for dropdown menu and apply green-on-white
 components.html(f"""
@@ -1252,6 +1242,14 @@ def render_home():
         _new_iso3 = _all_iso3s[_all_names.index(_chosen_name)]
         if _new_iso3 != st.session_state["country"]:
             st.session_state["country"] = _new_iso3
+            _new_partners = PARTNER_MAP.get(_new_iso3, set())
+            _partner_names = sorted(
+                COUNTRY_LOOKUP[_p]["name"] for _p in _new_partners if _p in COUNTRY_LOOKUP
+            )
+            st.session_state["country_group"] = _partner_names
+            # The multiselect widget's own key overrides `default=` after its first
+            # render, so it must be set directly for the box to actually show these.
+            st.session_state["country_group_widget"] = _partner_names
             st.rerun()
 
     if sel:
@@ -1282,231 +1280,135 @@ def render_home():
     _cmax2b     = max(_all_cent2b) if _all_cent2b else 1.0
     _sum_cent   = round((_centrality_index.get(sel, 0) / _cmax2b) * 100, 1) if sel and _centrality_index.get(sel) else None
 
-    # ── Country analysis + Discuss trade strategy (equal columns) ────────────
-    col_analysis, col_strategy = st.columns(2, gap="small")
+    # ── Analysis + current trade agreement partners (equal columns) ──────────
+    col_analysis, col_grp = st.columns(2, gap="small")
 
     with col_analysis:
-        if sel:
-            _n_agrs = len(_sum_agrs)
-            _agr_s  = "" if _n_agrs == 1 else "s"
+        with st.container(border=True, height=420):
+            if sel:
+                _n_agrs = len(_sum_agrs)
+                _agr_s  = "" if _n_agrs == 1 else "s"
 
-            # Depth qualifier
-            if depth_pct2 is None:
-                _depth_qual = ""
-            elif depth_pct2 >= 60:
-                _depth_qual = ", mostly of high agreement depth"
-            elif depth_pct2 >= 30:
-                _depth_qual = ", mostly of moderate agreement depth"
-            else:
-                _depth_qual = ", mostly of low agreement depth"
+                # Depth qualifier
+                if depth_pct2 is None:
+                    _depth_qual = ""
+                elif depth_pct2 >= 60:
+                    _depth_qual = ", mostly of high agreement depth"
+                elif depth_pct2 >= 30:
+                    _depth_qual = ", mostly of moderate agreement depth"
+                else:
+                    _depth_qual = ", mostly of low agreement depth"
 
-            # Centrality qualifier
-            if _sum_cent is None:
-                _cent_qual = "Its centrality in the global network of trade agreements is not available."
-            elif _sum_cent >= 60:
-                _cent_qual = f"It has high centrality in the global network of trade agreements, ranking among the most connected countries."
-            elif _sum_cent >= 25:
-                _cent_qual = f"It has moderate centrality in the global network of trade agreements, comparable to mid-tier trading nations."
-            else:
-                _cent_qual = f"It has low centrality in its network of trade agreements, compared to leading countries."
+                # Centrality qualifier
+                if _sum_cent is None:
+                    _cent_qual = "Its centrality in the global network of trade agreements is not available."
+                elif _sum_cent >= 60:
+                    _cent_qual = f"It has high centrality in the global network of trade agreements, ranking among the most connected countries."
+                elif _sum_cent >= 25:
+                    _cent_qual = f"It has moderate centrality in the global network of trade agreements, comparable to mid-tier trading nations."
+                else:
+                    _cent_qual = f"It has low centrality in its network of trade agreements, compared to leading countries."
 
-            # Complexity additionality qualifier
-            if _avg_peci is None:
-                _peci_qual = "Complexity additionality data is not available."
-            elif _avg_peci == 0.0:
-                _peci_qual = f"None of {sel_name}'s current trade partners are more economically complex, so existing agreements provide no complexity additionality."
-            elif _avg_peci >= 0.8:
-                _peci_qual = f"Exposure to more complex trade partners provides high complexity additionality (score: {_avg_peci:.2f}), with strong potential for knowledge transfer and upgrading."
-            elif _avg_peci >= 0.3:
-                _peci_qual = f"Exposure to more complex trade partners provides moderate complexity additionality (score: {_avg_peci:.2f})."
-            else:
-                _peci_qual = f"Exposure to more complex trade partners provides limited complexity additionality (score: {_avg_peci:.2f})."
+                # Complexity additionality qualifier
+                if _avg_peci is None:
+                    _peci_qual = "Complexity additionality data is not available."
+                elif _avg_peci == 0.0:
+                    _peci_qual = f"None of {sel_name}'s current trade partners are more economically complex, so existing agreements provide no complexity additionality."
+                elif _avg_peci >= 0.8:
+                    _peci_qual = f"Exposure to more complex trade partners provides high complexity additionality (score: {_avg_peci:.2f}), with strong potential for knowledge transfer and upgrading."
+                elif _avg_peci >= 0.3:
+                    _peci_qual = f"Exposure to more complex trade partners provides moderate complexity additionality (score: {_avg_peci:.2f})."
+                else:
+                    _peci_qual = f"Exposure to more complex trade partners provides limited complexity additionality (score: {_avg_peci:.2f})."
 
-            _agr_sent  = f"{sel_name} has {_n_agrs} FTA{_agr_s} on record{_depth_qual}."
-            _cent_sent = _cent_qual
-            _peci_sent = _peci_qual
+                _agr_sent  = f"{sel_name} has {_n_agrs} FTA{_agr_s} on record{_depth_qual}."
+                _cent_sent = _cent_qual
+                _peci_sent = _peci_qual
 
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;border:1px solid #e0e4ea;'
-                f'border-radius:8px;background:white;">'
-                f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
-                f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'
-                f'Country analysis</div>'
-                f'<div style="font-size:17px;color:#333;line-height:1.8;">'
-                f'{_html.escape(_agr_sent)} '
-                f'{_html.escape(_cent_sent)} '
-                f'{_html.escape(_peci_sent)}'
-                f'</div></div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
-                f'border-radius:8px;border:1px solid #e0e4ea;font-size:12px;color:#999;">'
-                f'Select a country to see its analysis.</div>',
-                unsafe_allow_html=True,
-            )
-
-    with col_strategy:
-        if sel:
-            # Clear history if user has switched country
-            if st.session_state["economist_country"] != sel:
-                st.session_state["economist_messages"] = []
-                st.session_state["economist_country"]  = sel
-
-            st.markdown(
-                f'<div style="margin-top:12px;font-size:15px;font-weight:700;'
-                f'color:{COLOR_BLUE};text-transform:uppercase;letter-spacing:.05em;">'
-                f'Discuss trade strategy</div>',
-                unsafe_allow_html=True,
-            )
-
-            for _msg in st.session_state["economist_messages"]:
-                _is_user = _msg["role"] == "user"
-                _bg   = "#f0f7f2" if not _is_user else "#f0f4fa"
-                _col  = COLOR_GREEN if not _is_user else COLOR_BLUE
-                _lbl  = "Trade economist" if not _is_user else "You"
                 st.markdown(
-                    f'<div style="margin-top:6px;padding:10px 14px;border-radius:8px;'
-                    f'background:{_bg};border-left:3px solid {_col};">'
-                    f'<div style="font-size:10px;font-weight:700;color:{_col};'
-                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">'
-                    f'{_lbl}</div>'
-                    f'<div style="font-size:13px;color:#222;line-height:1.6;">'
-                    f'{_html.escape(_msg["content"]).replace(chr(10), "<br>")}'
-                    f'</div></div>',
+                    f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
+                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'
+                    f'Analysis of current trade agreements position</div>'
+                    f'<div style="font-size:17px;color:#333;line-height:1.8;">'
+                    f'{_html.escape(_agr_sent)} '
+                    f'{_html.escape(_cent_sent)} '
+                    f'{_html.escape(_peci_sent)}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                # Filled in below, once the score-card figures further down the
+                # page have been computed — keeps both sections showing the
+                # exact same numbers rather than two independently-derived sets.
+                _analysis_numbers_slot = st.empty()
+            else:
+                st.markdown(
+                    f'<div style="color:#999;font-size:12px;">'
+                    f'Select a country to see its analysis.</div>',
                     unsafe_allow_html=True,
                 )
 
-            _user_input = st.chat_input(
-                "Ask about trade strategy…",
-                key="economist_input",
-            )
-
-            if _user_input and sel:
-                st.session_state["economist_messages"].append(
-                    {"role": "user", "content": _user_input}
-                )
-                _sys_prompt = (
-                    f"You are a trade economist advising on {sel_name}'s trade strategy. "
-                    f"Answer concisely and cite evidence where possible.\n\n"
-                    f"Country profile:\n"
-                    f"- FTA agreements on record: {len(_sum_agrs)}\n"
-                    f"- Network centrality: {_sum_cent} / 100\n"
-                    f"- Agreement depth (proxy): {round(min(_avg_depth / 47 * 100, 100), 1) if _avg_depth else 'not available'} / 100\n"
-                    f"- ECI: {f'{_sum_eci:+.2f}' if _sum_eci is not None else 'not available'}"
-                    + (f" (rank {_sum_rank} of {_sum_total})" if _sum_rank else "") + "\n"
-                    f"- Complexity additionality: {f'{_avg_peci:.2f}' if _avg_peci is not None else 'not available'}\n"
-                    f"- Integration profile: {_type_label}, {_cx_label}\n\n"
-                    f"Do not fabricate statistics. Label your response as AI-generated analysis."
-                )
-                try:
-                    _api_key = os.environ.get("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY")
-                    _client = anthropic.Anthropic(api_key=_api_key)
-                    _resp = _client.messages.create(
-                        model="claude-opus-4-7",
-                        max_tokens=1500,
-                        system=_sys_prompt,
-                        messages=st.session_state["economist_messages"],
-                    )
-                    _reply = _resp.content[0].text
-                except Exception as _e:
-                    _reply = f"Error: {_e}"
-                st.session_state["economist_messages"].append(
-                    {"role": "assistant", "content": _reply}
-                )
-                st.rerun()
-        else:
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
-                f'border-radius:8px;border:1px solid #e0e4ea;font-size:12px;color:#999;">'
-                f'Select a country to discuss trade strategy.</div>',
-                unsafe_allow_html=True,
-            )
-
-    # ── Two-column layout: globe (left) + group selector (right) ─────────────
-    col_globe_main, col_grp = st.columns([3, 2], gap="small")
-
-    with col_globe_main:
-        components.html(
-            _build_globe_html(sel=sel, sel_partners=sel_partners, intro_mode=False,
-                              all_eci=_eci_index, all_centrality=_centrality_index,
-                              pair_agreements=PAIR_AGREEMENTS,
-                              group_isos=_grp_iso3s),
-            height=640,
-        )
-
     with col_grp:
-        st.markdown(
-            f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
-            f'text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px 2px;">'
-            f'Assess a group of countries</div>',
-            unsafe_allow_html=True,
-        )
-        _grp_widget = st.multiselect(
-            "Assess a group",
-            options=_all_names,
-            default=st.session_state["country_group"],
-            placeholder="Select country…",
-            key="country_group_widget",
-            label_visibility="collapsed",
-        )
-        if _grp_widget != st.session_state["country_group"]:
-            st.session_state["country_group"] = _grp_widget
-            st.session_state["strategy_text"] = None
-            st.rerun()
-
-        if _grp_iso3s:
-            _pc = (COLOR_GREEN if _grp_avg_eci and _grp_avg_eci > 0.5 else
-                   (COLOR_ORANGE if _grp_avg_eci and _grp_avg_eci > -0.2 else COLOR_RED))
-            _sim_color = (COLOR_GREEN if _sim_cent and _sim_cent >= 60 else
-                          (COLOR_ORANGE if _sim_cent and _sim_cent >= 25 else COLOR_RED))
-
-            def _grp_row(label, val):
-                return (
-                    f'<div style="display:flex;justify-content:space-between;'
-                    f'padding:6px 12px;border-bottom:1px solid #f0f2f5;font-size:12px;">'
-                    f'<span style="color:#555;">{label}</span>'
-                    f'<span style="font-weight:700;color:{COLOR_BLUE};">{val}</span></div>'
-                )
-
-            if _sim_cent is not None:
-                _sim_delta = round(_sim_cent - (cent_pct2 or 0), 1)
-                _sim_delta_str = f"+{_sim_delta}" if _sim_delta >= 0 else str(_sim_delta)
-                _cent_row_val = (
-                    f'<span style="color:{_sim_color};">{_sim_cent:.1f} / 100</span>'
-                    f'<span style="color:#888;font-weight:400;font-size:10px;"> ({_sim_delta_str})</span>'
-                )
-                _cent_row_label = "Simulated centrality"
-            else:
-                _cent_row_val = "N/A"
-                _cent_row_label = "Simulated centrality"
-
-            rows_grp = "".join([
-                _grp_row("Countries selected", len(_grp_iso3s)),
-                _grp_row("Already partners", f"{len(_grp_already)} of {len(_grp_iso3s)}"),
-                _grp_row("New potential partners", len(_grp_new)),
-                _grp_row(_cent_row_label, _cent_row_val),
-                _grp_row("Avg group ECI",
-                         f'<span style="color:{_pc};">{_grp_avg_eci:+.2f}</span>'
-                         if _grp_avg_eci is not None else "N/A"),
-            ])
+        with st.container(border=True, height=420):
             st.markdown(
-                f'<div style="border:1px solid #e0e4ea;border-radius:8px;overflow:hidden;margin-top:8px;">'
-                f'<div style="padding:8px 12px;background:#f8f9fa;font-size:10px;font-weight:700;'
-                f'color:#888;text-transform:uppercase;letter-spacing:.05em;'
-                f'border-bottom:1px solid #e0e4ea;">Group summary</div>'
-                f'{rows_grp}</div>',
+                f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
+                f'text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px 2px;">'
+                f'Current trade agreement partners, add more</div>',
                 unsafe_allow_html=True,
             )
-        else:
-            st.markdown(
-                f'<div style="margin-top:12px;padding:14px 16px;background:#f8f9fa;'
-                f'border-radius:8px;border:1px solid #e0e4ea;font-size:13px;color:#999;">'
-                f'Select countries above to assess them as potential trade partners. '
-                f'The scores below will update as you add or remove countries.</div>',
-                unsafe_allow_html=True,
+            _grp_widget = st.multiselect(
+                "Current trade agreement partners, add more",
+                options=_all_names,
+                default=st.session_state["country_group"],
+                placeholder="Select country…",
+                key="country_group_widget",
+                label_visibility="collapsed",
             )
+            if _grp_widget != st.session_state["country_group"]:
+                st.session_state["country_group"] = _grp_widget
+                st.session_state["strategy_text"] = None
+                st.rerun()
+
+            # Colour the selected-country tags inside the multiselect by geographic
+            # region, matching the region colours used next to the globe.
+            _region_colors_json = json.dumps(NAME_TO_REGION_COLOR)
+            components.html(f"""
+<script>
+(function() {{
+  const REGION_COLORS = {_region_colors_json};
+  const doc = window.parent.document;
+
+  function styleTags() {{
+    doc.querySelectorAll('[data-baseweb="tag"]').forEach(tag => {{
+      const textEl = tag.querySelector('span') || tag;
+      const text = (textEl.textContent || '').trim();
+      const color = REGION_COLORS[text];
+      if (color) {{
+        tag.style.setProperty('background-color', color, 'important');
+        tag.style.setProperty('border-color', color, 'important');
+        tag.querySelectorAll('*').forEach(el => {{
+          el.style.setProperty('color', 'white', 'important');
+        }});
+      }}
+    }});
+  }}
+
+  styleTags();
+  const observer = new MutationObserver(styleTags);
+  observer.observe(doc.body, {{ childList: true, subtree: true }});
+}})();
+</script>
+""", height=1)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Globe (full width) ────────────────────────────────────────────────────
+    components.html(
+        _build_globe_html(sel=sel, sel_partners=sel_partners, intro_mode=False,
+                          all_eci=_eci_index, all_centrality=_centrality_index,
+                          pair_agreements=PAIR_AGREEMENTS,
+                          group_isos=_grp_new),
+        height=640,
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1807,6 +1709,18 @@ def render_home():
     _agr_label  = "Potential new partners" if _grp_mode else "Trade agreements"
     _cent_label = "Group centrality" if _grp_mode else "Network centrality"
     _exp_label  = "Simulated additionality" if (_grp_mode and _sim_exp_peci is not None) else "Complexity additionality"
+
+    if sel:
+        _analysis_numbers_slot.markdown(
+            f'<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;'
+            f'font-size:13px;color:#555;">'
+            f'<b>{_agr_label}:</b> {_disp_agr_val} &nbsp;·&nbsp; '
+            f'<b>{_cent_label}:</b> {_disp_cent_val} &nbsp;·&nbsp; '
+            f'<b>Agreement depth:</b> {_disp_depth_val} &nbsp;·&nbsp; '
+            f'<b>{_exp_label}:</b> {_disp_exp_val}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     cards_html = "".join([
         _card_full("aw", "ap", _agr_label, _disp_agr_val,
