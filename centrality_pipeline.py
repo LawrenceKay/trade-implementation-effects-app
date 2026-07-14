@@ -8,51 +8,97 @@ International Review of Economics & Finance, 98.
 Method (Fan et al. eq. 1):
     Centrality_i = λ⁻¹ · Σⱼ Depth_ij · eⱼ
 
-where Depth_ij = count of legally enforceable provisions between countries i and j
-(Hofmann et al. 2017 coding, 0–52 scale across 14 WTO+ and 38 WTO-X areas),
+where Depth_ij = count of binary (yes/no) provisions coded 1 for the deepest
+agreement between countries i and j, per WB DTA 2.0 "Vertical Content" data
+(1,007 scoreable provisions across ~20 policy areas; 64 categorical/
+multiple-choice items in the same sheet are excluded — see load_dta_depth()),
 λ = largest eigenvalue, e = eigenvector.
 
-Three centrality variants are computed:
+Note: DTA 2.0's provision set is more granular than the Hofmann et al. (2017)
+0–52 WTO+/WTO-X coding used in DTA 1.0 (and than the "0–48 scale" referenced
+in earlier CLAUDE.md notes), so absolute depth values here are NOT on the same
+scale as Fan et al.'s published figures — only the relative ordering across
+agreements is comparable. Eigenvector centrality is invariant to a positive
+rescaling of all edge weights, so this does not affect the centrality ranking.
+
+Five centrality variants are computed:
   • overall_centrality  — all FTA partners
-  • nn_centrality       — inter-regional (non-natural) partners only
-  • n_centrality        — intra-regional (natural) partners only
+  • nn_centrality       — via "non-natural" partners (CEPII bilateral
+                          distance above the country's own average — H2)
+  • n_centrality        — via "natural" partners (distance below the
+                          country's own average — H2)
+  • ed_centrality       — via connections to "Developed" (WB high-income,
+                          minus 5 oil-rich exclusions) partners (H3)
+  • ing_centrality      — via connections to "Developing" partners (H3)
 
 Fan et al. find nn_centrality has a significantly larger effect on ECI (β=0.298***)
-while n_centrality is not significant once controls are added.
+while n_centrality is not significant once controls are added. ed_centrality has
+the largest effect of all (β=3.514***).
 
 ─────────────────────────────────────────────────────────────────────────────────
 DATA REQUIRED (download once, place in data/raw/)
 ─────────────────────────────────────────────────────────────────────────────────
-1. DESTA dyadic dataset
-   • URL: https://www.designoftradeagreements.org/downloads/
-   • File to download: "List of dyads" → desta_list_of_dyads_02_01.csv
-   • Save to: data/raw/desta_dyads.csv
-   • Contains: one row per country-pair-agreement combination, with year and
-     depth/provision indicators
+1. World Bank DTA 2.0 vertical content  [network topology, depth, and
+   agreement stats; see CLAUDE.md Section 5, "Base network source mismatch",
+   for why the pipeline was migrated off DESTA]
+   • URL: https://datatopics.worldbank.org/dta/  → Download → DTA 2.0
+   • Save to: data/raw/DTA 2.0 - Vertical Content (v2).xlsx
+   • Contains: binary provision codings (0/1) for ~1,071 provisions across
+     ~20 policy areas and 400 agreements ("STATA" sheet), a bilateral
+     country-pair-year panel keyed by WBID ("Bilateral Information" sheet),
+     and per-agreement Status/entry-date metadata ("Agreements" sheet)
+   • Depth_ij = count of the 1,007 binary provisions coded 1 for the deepest
+     agreement between i and j (64 categorical/multiple-choice provisions in
+     the same sheet are excluded — they don't code presence/absence)
+   • Network edges = country pairs with a currently-in-force agreement
+     (Status == "In Force" or "In force for at least one Party"), or —
+     with --year — agreements whose goods entry-into-force date is on or
+     before that year, regardless of current Status (see get_valid_wbids)
 
-2. World Bank DTA 1.0 horizontal depth  [optional but improves accuracy]
-   • URL: https://datatopics.worldbank.org/dta/  → Download → DTA 1.0
-   • Save to: data/raw/DTA 1.0 - Horizontal Content (v2).xlsx
-   • Contains: legally enforceable provision scores (0/1/2) for 52 policy areas
-     across 390 agreements, plus bilateral country-pair data
-   • Depth_ij = count of provisions with legal enforceability score >= 1
-     (Hofmann et al. 2017 total depth measure, max 52)
+2. World Bank Country and Lending Groups classification  [region (display
+   only) + income group per country; income group feeds the ED/ING
+   developed/developing split — see CLAUDE.md Section 5, "'Developed'/
+   'developing' sub-network split (H3)"]
+   • URL: https://datahelpdesk.worldbank.org/knowledgebase/articles/906519
+   • Save to: data/raw/CLASS_2026_07_01.xlsx (filename has a date — update
+     INCOME_CLASS_PATH if downloading a newer version)
+   • "Developed" = WB "High income" minus 5 oil-abundant economies Fan et
+     al. (2025, footnote 4, p.7) explicitly exclude: SAU, KWT, QAT, OMN, BHR
 
-If only DESTA is present the pipeline falls back to DESTA's depth_index proxy.
+3. CEPII GeoDist bilateral distance database  [real geographic distance,
+   used for the natural/non-natural split — see CLAUDE.md Section 5,
+   "'Non-natural' split is a coarser proxy"]
+   • URL: https://www.cepii.fr/distance/dist_cepii.dta (Etalab 2.0 licence)
+   • Save to: data/raw/dist_cepii.dta
+   • Uses `distw` (bilateral weighted geographic distance) — the exact CEPII
+     variable Fan et al. cite in their data appendix. Each country's own
+     natural/non-natural threshold is its own average distw to its own trade
+     partners (a per-country average, not one global cutoff — see
+     compute_natural_thresholds). CEPII uses an older ISO3 vintage for a
+     few countries (CEPII_ISO_ALIASES maps the unambiguous ones); 6 others
+     (Montenegro, Serbia, Liechtenstein, Palestine, Kosovo, South Sudan) are
+     genuinely absent from this CEPII vintage.
 ─────────────────────────────────────────────────────────────────────────────────
 
 Output
 ------
   data/processed/centrality_scores.csv
-    iso3, name, region, overall_centrality, nn_centrality, n_centrality,
-    overall_rank, nn_rank, n_rank, n_agreements, n_partners
+    iso3, name, region, income_group, overall_centrality, nn_centrality,
+    n_centrality, ed_centrality, ing_centrality, overall_rank, nn_rank,
+    n_rank, ed_rank, ing_rank, n_agreements, n_partners, avg_enforceable,
+    max_enforceable
+  data/processed/fta_network_edges.csv
+    iso1, iso2, weight
+  data/processed/agreements.csv
+    iso1, iso2, WBID, agreement, entry_year — feeds network_example.py's
+    PARTNER_MAP/AGREEMENTS_MAP/PAIR_AGREEMENTS
 
 Usage
 -----
   conda activate trade-app
   python centrality_pipeline.py
 
-  # Optional: specify a year (defaults to most recent available)
+  # Historical snapshot: agreements with goods entry-into-force <= 2015
   python centrality_pipeline.py --year 2015
 
   # Run and immediately open results table
@@ -66,7 +112,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import networkx as nx
-import pycountry
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -75,10 +120,26 @@ DATA_RAW     = PROJECT_ROOT / "data" / "raw"
 DATA_PROC    = PROJECT_ROOT / "data" / "processed"
 DATA_PROC.mkdir(parents=True, exist_ok=True)
 
-DESTA_PATH    = DATA_RAW / "desta_dyads.csv"
-DTA_EXCEL_PATH = DATA_RAW / "DTA 1.0 - Horizontal Content (v2).xlsx"
+DTA_EXCEL_PATH = DATA_RAW / "DTA 2.0 - Vertical Content (v2).xlsx"
+INCOME_CLASS_PATH = DATA_RAW / "CLASS_2026_07_01.xlsx"
+CEPII_DIST_PATH = DATA_RAW / "dist_cepii.dta"
 OUTPUT_PATH   = DATA_PROC / "centrality_scores.csv"
 EDGES_PATH    = DATA_PROC / "fta_network_edges.csv"
+AGREEMENTS_PATH = DATA_PROC / "agreements.csv"
+
+# CEPII GeoDist uses an older ISO3 vintage for a few countries — maps our
+# network's current code to CEPII's code where the equivalence is
+# unambiguous (Romania's pre-ISO-update code; Zaire, DR Congo's former
+# name/code). Other missing countries (Montenegro, Serbia, Liechtenstein,
+# Palestine, Kosovo, South Sudan) are genuinely absent from this CEPII
+# vintage — mostly newer/partially-recognised states — and are left as a
+# real "no distance data" gap rather than guessed at.
+CEPII_ISO_ALIASES = {"ROU": "ROM", "COD": "ZAR"}
+
+# Oil-abundant high-income economies excluded from "developed" per Fan et al.
+# (2025), footnote 4, page 7 — see CLAUDE.md Section 5, "'Developed'/
+# 'developing' sub-network split (H3)"
+OIL_RICH_EXCLUDED = {"SAU", "KWT", "QAT", "OMN", "BHR"}
 
 # ── World Bank regional classification ────────────────────────────────────────
 # Used to split natural (intra-regional) vs non-natural (inter-regional) networks.
@@ -128,6 +189,21 @@ WB_REGION = {
     "NER":"SSA","NGA":"SSA","RWA":"SSA","SDN":"SSA","SEN":"SSA","SLE":"SSA",
     "SOM":"SSA","SSD":"SSA","STP":"SSA","SWZ":"SSA","SYC":"SSA","TCD":"SSA",
     "TGO":"SSA","TZA":"SSA","UGA":"SSA","ZAF":"SSA","ZMB":"SSA","ZWE":"SSA",
+    # Small territories not in the standard WB region tables — classified by
+    # geographic proximity, not by governing/sovereign state (see CLAUDE.md
+    # Section 5, "Base network source mismatch", task 4). Most are
+    # unambiguous (Caribbean -> LAC, Pacific -> EAP, Hong Kong/Macao/Taiwan
+    # -> EAP, Andorra/San Marino -> ECA). Four North Atlantic territories are
+    # politically European/British but geographically at or near North
+    # America — classified by physical location: Greenland and Saint Pierre
+    # & Miquelon -> NAM (on/off the North American continent); Bermuda ->
+    # NAM (~1,050km to North Carolina vs ~5,000km to the UK); Faroe Islands
+    # -> ECA (North Atlantic, near Norway/Scotland, not close to NAM).
+    "ABW":"LAC","AIA":"LAC","CYM":"LAC","MSR":"LAC","TCA":"LAC",     # Caribbean
+    "COK":"EAP","NCL":"EAP","NIU":"EAP","PCN":"EAP","PYF":"EAP",
+    "WLF":"EAP","HKG":"EAP","MAC":"EAP","TWN":"EAP",                # Pacific / East Asia
+    "AND":"ECA","SMR":"ECA","FRO":"ECA",                            # Europe
+    "BMU":"NAM","GRL":"NAM","SPM":"NAM",                            # North Atlantic (geographic proximity)
 }
 
 # Country name lookup (iso3 → readable name)
@@ -160,120 +236,172 @@ COUNTRY_NAMES = {
 def parse_args():
     p = argparse.ArgumentParser(description="Compute FTA network centrality (Fan et al. 2025)")
     p.add_argument("--year", type=int, default=None,
-                   help="Use agreements in force as of this year (default: latest)")
+                   help="Historical mode: agreements whose goods entry-into-force date is "
+                        "<= this year, ignoring current Status (default: live network — "
+                        "agreements currently in force)")
     p.add_argument("--show", action="store_true",
                    help="Print top-20 countries by centrality after computing")
     return p.parse_args()
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 
-def numeric_to_alpha3(numeric_code):
-    """Convert ISO numeric country code (int or str) to ISO 3166-1 alpha-3."""
-    try:
-        country = pycountry.countries.get(numeric=str(int(numeric_code)).zfill(3))
-        return country.alpha_3 if country else None
-    except (ValueError, TypeError):
-        return None
-
-
 def check_data_files():
     """Check required files are present; exit with instructions if not."""
-    if not DESTA_PATH.exists():
-        print("""
-ERROR: DESTA dyadic dataset not found.
+    if not DTA_EXCEL_PATH.exists():
+        print(f"""
+ERROR: WB DTA 2.0 dataset not found — this is the sole data source for
+this pipeline (see CLAUDE.md Section 5, "Base network source mismatch"),
+so it cannot run without it.
 
 Download it here:
-  https://www.designoftradeagreements.org/downloads/
+  https://datatopics.worldbank.org/dta/
 
 Steps:
-  1. Go to the URL above
-  2. Under "Dyadic data", download "List of dyads (version 02_01)"
-  3. Save the CSV file as:
-     data/raw/desta_dyads.csv
+  1. Go to the URL above and download DTA 2.0 ("Vertical Content")
+  2. Save the file as:
+     data/raw/{DTA_EXCEL_PATH.name}
+
+Then re-run:  python centrality_pipeline.py
+""")
+        sys.exit(1)
+    if not INCOME_CLASS_PATH.exists():
+        print(f"""
+ERROR: WB income classification file not found — needed for the ED/ING
+(developed/developing) centrality split (see CLAUDE.md Section 5,
+"'Developed'/'developing' sub-network split (H3)").
+
+Download it here:
+  https://datahelpdesk.worldbank.org/knowledgebase/articles/906519
+
+Steps:
+  1. Go to the URL above and download the current "CLASS.xlsx" file
+  2. Save it as:
+     data/raw/{INCOME_CLASS_PATH.name}
+     (note: this filename has a date in it — if you've downloaded a newer
+     version, update INCOME_CLASS_PATH in centrality_pipeline.py to match)
+
+Then re-run:  python centrality_pipeline.py
+""")
+        sys.exit(1)
+    if not CEPII_DIST_PATH.exists():
+        print(f"""
+ERROR: CEPII GeoDist distance dataset not found — needed for the natural/
+non-natural centrality split (see CLAUDE.md Section 5, "'Non-natural' split
+is a coarser proxy").
+
+Download it here:
+  https://www.cepii.fr/distance/dist_cepii.dta
+
+Steps:
+  1. Go to the URL above (Etalab 2.0 open licence, no auth needed)
+  2. Save the file as:
+     data/raw/{CEPII_DIST_PATH.name}
 
 Then re-run:  python centrality_pipeline.py
 """)
         sys.exit(1)
 
 
-def load_desta(year_filter=None):
+def get_valid_wbids(agreements, year_filter=None):
     """
-    Load DESTA dyadic dataset.
+    Determine which WBIDs count as a live network edge — see CLAUDE.md
+    Section 5 ("Base network source mismatch") for the full reasoning.
 
-    DESTA dyadic columns used:
-      iso1, iso2       — ISO3 country codes
-      base_treaty      — agreement identifier
-      year             — year agreement entered into force
-      depth_index      — overall depth index (0–1 range, Fan et al. proxy)
-      pta              — 1 if preferential trade agreement
-      fta_goods        — 1 if FTA covering goods
+    Default (year_filter=None) — live/current-state snapshot:
+      Status in {"In Force", "In force for at least one Party"}. Excludes
+      the 16 "Inactive" agreements (e.g. NAFTA, superseded by USMCA in 2020)
+      and "Early Announcement" agreements never actually ratified (e.g.
+      EU-MERCOSUR). PACER Plus / SADC ("In force for at least one Party")
+      are included at the WBID level and trusted pair-by-pair via whichever
+      rows actually appear in Bilateral Information, rather than excluded
+      for partial ratification elsewhere.
 
-    Fan et al. use the Hofmann et al. (2017) depth measure from DTA 2.0.
-    DESTA's depth_index is used here as a good available proxy when DTA 2.0
-    depth scores are not available.
+    --year mode — historical snapshot:
+      Agreements whose goods entry-into-force date (Date of Entry into
+      Force (G) — not (S)/services, a deliberate goods-focused scope choice)
+      is on or before year_filter, regardless of current Status. An
+      agreement inactive today (e.g. NAFTA) still counts for a year when it
+      really was in force.
     """
-    df = pd.read_csv(DESTA_PATH, low_memory=False, encoding="latin-1")
-    print(f"  Loaded DESTA: {len(df):,} dyadic rows, columns: {list(df.columns[:10])}...")
-
-    # Normalise column names to lower case
-    df.columns = df.columns.str.lower().str.strip()
-
-    # Convert numeric ISO codes to alpha-3
-    if "iso1" in df.columns and df["iso1"].dtype in [int, float, "int64", "float64"]:
-        print("  Converting numeric ISO codes to alpha-3...")
-        df["iso1"] = df["iso1"].apply(numeric_to_alpha3)
-        df["iso2"] = df["iso2"].apply(numeric_to_alpha3)
-
-    # Drop rows where conversion failed
-    before = len(df)
-    df = df.dropna(subset=["iso1", "iso2"])
-    if len(df) < before:
-        print(f"  Dropped {before - len(df):,} rows with unresolved country codes")
-
-    # Keep only active PTAs
-    if year_filter and "entryforceyear" in df.columns:
-        df = df[df["entryforceyear"] <= year_filter]
-    elif year_filter and "year" in df.columns:
-        df = df[df["year"] <= year_filter]
-
-    # Fan et al. restrict to PTAs (excluding WTO/MFN-only)
-    if "pta" in df.columns:
-        df = df[df["pta"] == 1]
-    elif "fta_goods" in df.columns:
-        df = df[df["fta_goods"] == 1]
-
-    return df
+    if year_filter is None:
+        mask = agreements["Status"].isin(["In Force", "In force for at least one Party"])
+    else:
+        entry_g = pd.to_datetime(agreements["Date of Entry into Force (G)"], errors="coerce")
+        mask = entry_g.dt.year <= year_filter
+    return set(agreements.loc[mask, "WBID"])
 
 
-def load_dta_bilateral_depth():
+def load_wb_dta(year_filter=None):
     """
-    Load WB DTA 1.0 horizontal depth scores (Hofmann et al. 2017).
+    Load WB DTA 2.0 as the sole source of network topology, edge depth, and
+    per-country agreement stats — see CLAUDE.md Section 5 ("Base network
+    source mismatch") for why DESTA was retired from this role. Topology and
+    depth now come from the exact same Status/year-filtered dataset, so
+    (unlike the old DESTA+DTA-2.0 split) every edge has a real depth by
+    construction — no fallback needed.
 
-    Reads the WTO+ LE and WTO-X LE sheets, counts legally enforceable provisions
-    (value >= 1) per agreement across all 52 policy areas, then joins to the
-    Bilateral Information sheet to produce a per-country-pair depth lookup.
+    Reads the STATA sheet, a provision (row) x agreement (column, `agree_N`)
+    matrix where `agree_N` corresponds to WBID=N (verified 1:1, both run 1-400).
+    Each provision row is classified as binary (values only in {0, 1, blank})
+    or categorical (free-text / multiple-choice, e.g. "A/B/C" classification
+    questions). Depth_agreement = count of binary provisions coded 1;
+    categorical rows are excluded since they don't code presence/absence.
 
-    Returns dict {(iso1, iso2): depth_score} with keys sorted alphabetically,
-    or None if the Excel file is not present.
+    Joins the resulting per-agreement depth to the Bilateral Information sheet
+    (iso1, iso2, WBID panel), after filtering to valid WBIDs (see
+    get_valid_wbids), to produce a per-country-pair depth lookup — this
+    lookup IS the network's edge set, not just a weight overlay — and
+    separately a per-country lookup of avg/max provision depth across all of
+    that country's own (valid) agreements.
+
+    Returns (depth_lookup, country_depth_stats, entry_year_lookup,
+    pair_agreements) where depth_lookup is dict {(iso1, iso2): depth_score}
+    with keys sorted alphabetically, country_depth_stats is a DataFrame with
+    columns iso, n_agreements, avg_enforceable, max_enforceable,
+    entry_year_lookup is dict {WBID: year} from the goods entry-into-force
+    date, and pair_agreements is a DataFrame with columns iso1, iso2, WBID,
+    agreement, entry_year (one row per valid country-pair-agreement,
+    deduplicated across the bilateral panel's years) — feeds
+    network_example.py's agreement-listing UI. Returns
+    (None, None, None, None) if the Excel file is not present.
     """
     if not DTA_EXCEL_PATH.exists():
-        return None
+        return None, None, None, None
 
-    print(f"  Loading DTA 1.0 from {DTA_EXCEL_PATH.name}...")
-    wto_plus_le = pd.read_excel(DTA_EXCEL_PATH, sheet_name="WTO+ LE")
-    wto_x_le   = pd.read_excel(DTA_EXCEL_PATH, sheet_name="WTO-X LE")
+    print(f"  Loading DTA 2.0 from {DTA_EXCEL_PATH.name}...")
+    agreements = pd.read_excel(DTA_EXCEL_PATH, sheet_name="Agreements").rename(columns={"WB ID": "WBID"})
+    stata      = pd.read_excel(DTA_EXCEL_PATH, sheet_name="STATA")
     bilateral  = pd.read_excel(DTA_EXCEL_PATH, sheet_name="Bilateral Information")
 
-    # Count legally enforceable provisions (value >= 1) per agreement
-    meta_cols = {"RTAID", "WBID", "Agreement"}
-    prov_plus = [c for c in wto_plus_le.columns if c not in meta_cols]
-    prov_x    = [c for c in wto_x_le.columns   if c not in meta_cols]
+    valid_wbids = get_valid_wbids(agreements, year_filter)
+    if year_filter:
+        print(f"  Historical mode: agreements with goods entry-into-force <= {year_filter}: {len(valid_wbids)}")
+    else:
+        print(f"  Live mode: agreements currently in force: {len(valid_wbids)}")
+    bilateral = bilateral[bilateral["WBID"].isin(valid_wbids)].copy()
 
-    depth_scores = pd.DataFrame({
-        "WBID":  wto_plus_le["WBID"],
-        "depth": (wto_plus_le[prov_plus] >= 1).sum(axis=1)
-                 + (wto_x_le[prov_x] >= 1).sum(axis=1),
-    })
+    entry_g = pd.to_datetime(agreements["Date of Entry into Force (G)"], errors="coerce")
+    entry_year_lookup = {
+        int(wbid): int(yr) for wbid, yr in zip(agreements["WBID"], entry_g.dt.year) if pd.notna(yr)
+    }
+
+    agree_cols = [c for c in stata.columns if str(c).startswith("agree_")]
+
+    # A provision row is "binary" if every value across all agreements is
+    # in {0, 1, blank}; anything else (free text, letter codes) is categorical.
+    def is_binary_row(row):
+        return row[agree_cols].apply(
+            lambda v: pd.isna(v) or v in (0, 1, "0", "1", "")
+        ).all()
+
+    binary_mask = stata.apply(is_binary_row, axis=1)
+    print(f"  Provisions: {binary_mask.sum()} binary (scored), "
+          f"{(~binary_mask).sum()} categorical (excluded)")
+
+    binary_provisions = stata.loc[binary_mask, agree_cols]
+    depth_per_wbid = (binary_provisions == 1).sum(axis=0)  # sum down rows, per agreement column
+    depth_per_wbid.index = depth_per_wbid.index.str.replace("agree_", "", regex=False).astype(int)
+    depth_scores = depth_per_wbid.rename("depth").rename_axis("WBID").reset_index()
     print(f"  Depth scores: {len(depth_scores)} agreements, "
           f"max={depth_scores['depth'].max()}, mean={depth_scores['depth'].mean():.1f}")
 
@@ -290,120 +418,290 @@ def load_dta_bilateral_depth():
         if depth > lookup.get(key, 0):
             lookup[key] = depth
 
-    print(f"  Bilateral depth lookup: {len(lookup):,} country pairs")
+    print(f"  Network edges (unique country pairs, valid agreements only): {len(lookup):,}")
+
+    # Per-country agreement stats: for each country, n_agreements (count of
+    # its own valid WBIDs) and avg/max depth across those agreements
+    # (regardless of partner) — one row per (country, WBID), deduplicated
+    # across the bilateral panel's years.
+    country_agreements = pd.concat([
+        bilateral[["iso1", "WBID", "depth"]].rename(columns={"iso1": "iso"}),
+        bilateral[["iso2", "WBID", "depth"]].rename(columns={"iso2": "iso"}),
+    ]).drop_duplicates(subset=["iso", "WBID"])
+    country_depth_stats = (
+        country_agreements.groupby("iso")
+        .agg(n_agreements=("WBID", "nunique"),
+             avg_enforceable=("depth", "mean"),
+             max_enforceable=("depth", "max"))
+        .reset_index()
+    )
+    print(f"  Country agreement/depth stats: {len(country_depth_stats)} countries")
+
+    # Per-pair-per-agreement listing (name + entry year), one row per
+    # (iso1, iso2, WBID), deduplicated across the bilateral panel's years —
+    # feeds network_example.py's PARTNER_MAP/AGREEMENTS_MAP/PAIR_AGREEMENTS
+    # (see CLAUDE.md Section 5, task 7 of the DESTA migration).
+    pair_agreements = (
+        bilateral[["iso1", "iso2", "WBID"]]
+        .drop_duplicates()
+        .merge(agreements[["WBID", "Agreement"]], on="WBID", how="left")
+        .rename(columns={"Agreement": "agreement"})
+    )
+    pair_agreements["entry_year"] = pair_agreements["WBID"].map(entry_year_lookup)
+    print(f"  Pair/agreement listing: {len(pair_agreements):,} rows")
+
+    return lookup, country_depth_stats, entry_year_lookup, pair_agreements
+
+
+def load_cepii_distance():
+    """
+    Load CEPII GeoDist bilateral weighted distance (distw) — see CLAUDE.md
+    Section 5, "'Non-natural' split is a coarser proxy", for why this
+    replaces the WB-region proxy. Fan et al. (2025) cite this exact CEPII
+    variable ("bilateral weighted geographic distance", appendix table; same
+    term used in their IV robustness equation) as their distance measure.
+
+    Applies CEPII_ISO_ALIASES for the two countries with an unambiguous
+    older-code equivalent in this CEPII vintage; other missing countries
+    are a genuine data gap, not remapped.
+
+    Returns dict {(iso1, iso2): distw_km} with keys sorted alphabetically
+    (distance is symmetric — confirmed empirically to match to ~1m of
+    rounding noise in both directions).
+    """
+    alias_to_current = {v: k for k, v in CEPII_ISO_ALIASES.items()}
+    df = pd.read_stata(CEPII_DIST_PATH)
+    df = df[df["iso_o"] != df["iso_d"]]
+    df["iso_o"] = df["iso_o"].map(lambda x: alias_to_current.get(x, x))
+    df["iso_d"] = df["iso_d"].map(lambda x: alias_to_current.get(x, x))
+
+    lookup = {}
+    for _, row in df.iterrows():
+        key = tuple(sorted([row["iso_o"], row["iso_d"]]))
+        lookup[key] = row["distw"]
+    print(f"  CEPII distance lookup: {len(lookup):,} country pairs")
     return lookup
 
 
 # ── Network construction ───────────────────────────────────────────────────────
 
-def detect_depth_column(df):
+def build_network(depth_lookup):
     """
-    Identify the best available depth column in the DESTA dataframe.
-    Priority: depth_index > depth_ra_goods_sd > wto_coverage > 1 (binary)
-    """
-    for col in ["depth_index", "depth_ra_goods_sd", "depth_ra_goods", "depth_goods", "wto_coverage"]:
-        if col in df.columns:
-            print(f"  Using depth column: '{col}'")
-            return col
-    print("  No depth column found — using binary (agreement present = 1)")
-    return None
-
-
-def build_network(df, depth_col, bilateral_depth_lookup=None):
-    """
-    Build a weighted undirected graph.
-
-    Edge weight = Depth_ij from Hofmann et al. (2017) when the DTA 1.0 bilateral
-    lookup is available; falls back to DESTA's depth_index proxy otherwise.
-    If multiple agreements exist between a pair, the maximum depth is kept,
-    following Fan et al.'s approach.
+    Build a weighted undirected graph directly from the WB DTA 2.0 depth
+    lookup (see load_wb_dta) — topology and edge weight both come from the
+    exact same Status/year-filtered dataset, so every edge has a real depth
+    by construction. If multiple valid agreements connect the same pair, the
+    maximum depth is kept, following Fan et al.'s approach.
     """
     G = nx.Graph()
 
-    for _, row in df.iterrows():
-        iso1 = str(row.get("iso1", "")).strip().upper()
-        iso2 = str(row.get("iso2", "")).strip().upper()
-
-        if not iso1 or not iso2 or iso1 == iso2:
-            continue
-
-        # Prefer DTA 1.0 bilateral depth (Hofmann et al. 2017)
-        weight = None
-        if bilateral_depth_lookup is not None:
-            key = tuple(sorted([iso1, iso2]))
-            weight = bilateral_depth_lookup.get(key, None)
-
-        # Fall back to DESTA depth proxy
-        if weight is None and depth_col:
-            raw = row.get(depth_col, np.nan)
-            weight = float(raw) if pd.notna(raw) and raw != "" else 1.0
-        elif weight is None:
-            weight = 1.0
-
+    for (iso1, iso2), weight in depth_lookup.items():
         weight = max(float(weight), 0.01)  # guard against zero weights
-
-        if G.has_edge(iso1, iso2):
-            G[iso1][iso2]["weight"] = max(G[iso1][iso2]["weight"], weight)
-        else:
-            G.add_edge(iso1, iso2, weight=weight)
+        G.add_edge(iso1, iso2, weight=weight)
 
     print(f"  Network: {G.number_of_nodes()} countries, {G.number_of_edges()} agreement pairs")
     return G
 
 
-def build_region_lookup_from_desta(df):
+def compute_natural_thresholds(G, distance_lookup):
     """
-    Build a per-country region dict from DESTA's regioncon column.
-    DESTA regioncon encodes the region of country1 for each dyad row.
-    We take the most frequent regioncon value for each iso1 code.
+    Each country's own natural/non-natural distance threshold: the average
+    CEPII bilateral weighted distance (distw) across all of *its own* trade
+    partners with known distance data — see CLAUDE.md Section 5, "'Non-
+    natural' split is a coarser proxy", for why this is a per-country average
+    rather than one global cutoff (per the paper's own self-referential
+    phrasing: "the country"... "its trade partners"... "the average level").
+
+    Returns dict {iso3: threshold_km}. Countries with no partners having
+    known distance data are omitted (threshold undefined for them).
     """
-    if "regioncon" not in df.columns:
-        return {}
-    lookup = {}
-    for iso_col, region_col in [("iso1", "regioncon"), ("iso2", "regioncon")]:
-        if iso_col == "iso2":
-            # regioncon in DESTA records the region of country1 only, so
-            # use WB_REGION as fallback for iso2
-            break
-        grp = df.groupby(iso_col)["regioncon"].agg(lambda x: x.mode().iloc[0])
-        lookup.update(grp.to_dict())
-    return lookup
+    thresholds = {}
+    for node in G.nodes():
+        partner_dists = [
+            distance_lookup[tuple(sorted([node, nbr]))]
+            for nbr in G.neighbors(node)
+            if tuple(sorted([node, nbr])) in distance_lookup
+        ]
+        if partner_dists:
+            thresholds[node] = sum(partner_dists) / len(partner_dists)
+    print(f"  Natural/non-natural thresholds computed for {len(thresholds)} "
+          f"of {G.number_of_nodes()} countries")
+    return thresholds
 
 
-def split_natural_nonnatural(G, desta_region_lookup=None):
+def split_natural_nonnatural(G, distance_lookup, thresholds):
     """
-    Split edges into natural (intra-regional) and non-natural (inter-regional).
-    Fan et al. (2025) classify intra-regional as 'natural' following Baldwin (2006).
-    Uses WB_REGION dict; falls back to DESTA regioncon if WB_REGION has no entry.
+    Split edges into natural and non-natural subgraphs using real CEPII
+    bilateral distance data and each country's own per-country threshold
+    (see compute_natural_thresholds) — replacing the earlier WB-region proxy
+    with Fan et al. (2025)'s actual distance-based methodology.
+
+    Like the ED/ING split, this is asymmetric and the two subgraphs
+    *overlap* rather than partition cleanly: an edge (i,j) can be "natural"
+    from i's perspective (dist < i's own threshold) while simultaneously
+    "non-natural" from j's perspective (dist > j's own threshold), since i
+    and j generally have different thresholds. G_natural includes an edge if
+    *either* endpoint's own threshold classifies it natural; G_nonnatural if
+    either classifies it non-natural. Edges with no distance data, or where
+    neither endpoint has a computable threshold, are excluded from both.
     """
     G_natural     = nx.Graph()
     G_nonnatural  = nx.Graph()
+    n_no_data = 0
 
     for u, v, data in G.edges(data=True):
-        region_u = WB_REGION.get(u) or (desta_region_lookup or {}).get(u)
-        region_v = WB_REGION.get(v) or (desta_region_lookup or {}).get(v)
-        if region_u and region_v and region_u == region_v:
+        dist_uv = distance_lookup.get(tuple(sorted([u, v])))
+        if dist_uv is None:
+            n_no_data += 1
+            continue
+
+        is_natural = False
+        is_nonnatural = False
+        if u in thresholds:
+            if dist_uv < thresholds[u]:
+                is_natural = True
+            else:
+                is_nonnatural = True
+        if v in thresholds:
+            if dist_uv < thresholds[v]:
+                is_natural = True
+            else:
+                is_nonnatural = True
+
+        if is_natural:
             G_natural.add_edge(u, v, **data)
-        else:
+        if is_nonnatural:
             G_nonnatural.add_edge(u, v, **data)
 
-    print(f"  Natural (intra-regional) edges:     {G_natural.number_of_edges()}")
-    print(f"  Non-natural (inter-regional) edges: {G_nonnatural.number_of_edges()}")
+    print(f"  Natural edges:     {G_natural.number_of_edges()}")
+    print(f"  Non-natural edges: {G_nonnatural.number_of_edges()}")
+    print(f"  Edges excluded from both (no distance data): {n_no_data}")
     return G_natural, G_nonnatural
+
+
+def load_income_classification():
+    """
+    Load WB income classification (data/raw/CLASS_2026_07_01.xlsx, "List of
+    economies" sheet), applying Fan et al.'s oil-rich exclusion.
+
+    A country is "Developed" if WB classifies it "High income" AND it is not
+    one of the 5 oil-abundant economies Fan et al. (2025, footnote 4, p.7)
+    explicitly exclude from that bucket (OIL_RICH_EXCLUDED). Every other
+    country with a known income group (Low/Lower middle/Upper middle income,
+    or High income but oil-rich) is "Developing" — see CLAUDE.md Section 5,
+    "'Developed'/'developing' sub-network split (H3)" for the full reasoning.
+
+    Returns dict {iso3: "Developed" | "Developing"}.
+    """
+    df = pd.read_excel(INCOME_CLASS_PATH, sheet_name="List of economies")
+    classification = {}
+    for _, row in df.iterrows():
+        iso = row["Code"]
+        income_group = row["Income group"]
+        if pd.isna(iso) or pd.isna(income_group):
+            continue
+        if income_group == "High income" and iso not in OIL_RICH_EXCLUDED:
+            classification[iso] = "Developed"
+        else:
+            classification[iso] = "Developing"
+    n_developed = sum(1 for v in classification.values() if v == "Developed")
+    print(f"  Income classification: {n_developed} Developed, "
+          f"{len(classification) - n_developed} Developing")
+    return classification
+
+
+def split_developed_developing(G, income_classification):
+    """
+    Build G_ED (edges touching at least one Developed country) and G_ING
+    (edges touching at least one Developing country) — see CLAUDE.md Section
+    5, "'Developed'/'developing' sub-network split (H3)" for why this is an
+    asymmetric, *overlapping* pair of subgraphs rather than a clean partition
+    like natural/non-natural: Fan et al. define a partner as belonging to a
+    country's "developed network" based on the *partner's* own classification,
+    not a symmetric same-group requirement, so a Developed-Developing edge
+    genuinely belongs to both a developing country's ED network and a
+    developed country's ING network simultaneously.
+
+    Edges where neither endpoint has a known classification (e.g. a
+    territory not covered by the WB income file) are excluded from both.
+    """
+    G_ed  = nx.Graph()
+    G_ing = nx.Graph()
+
+    for u, v, data in G.edges(data=True):
+        class_u = income_classification.get(u)
+        class_v = income_classification.get(v)
+        if class_u == "Developed" or class_v == "Developed":
+            G_ed.add_edge(u, v, **data)
+        if class_u == "Developing" or class_v == "Developing":
+            G_ing.add_edge(u, v, **data)
+
+    print(f"  ED (developed-partner) edges:  {G_ed.number_of_edges()}")
+    print(f"  ING (developing-partner) edges: {G_ing.number_of_edges()}")
+    return G_ed, G_ing
 
 
 # ── Centrality computation ─────────────────────────────────────────────────────
 
+def eigenvector_centrality_per_component(G, label=""):
+    """
+    Compute eigenvector centrality separately within each connected component,
+    then rescale each component's (unit-normalised) score vector by that
+    component's own dominant eigenvalue.
+
+    A single global power iteration on a disconnected graph converges to the
+    dominant eigenvector of whichever component has the largest eigenvalue —
+    every other component's scores underflow towards 0 (e.g. Canada/Vietnam/
+    Peru's natural centrality reading as ~1e-223 when Europe dominates).
+    Solving per component and rescaling by each component's own eigenvalue
+    keeps that same "richer/denser region scores higher" property, while
+    still giving every region a meaningful, non-degenerate internal ranking.
+    Isolated (single-node) components get a score of 0.
+    """
+    cent = {}
+    for nodes in nx.connected_components(G):
+        sub = G.subgraph(nodes)
+        if sub.number_of_nodes() == 1:
+            cent[next(iter(nodes))] = 0.0
+            continue
+        try:
+            # scipy's sparse ARPACK solver (used internally here) requires
+            # k < N-1 eigenvalues, which fails for small components (a handful
+            # of nodes) — fall back to power iteration for those.
+            sub_cent = nx.eigenvector_centrality_numpy(sub, weight="weight")
+        except (nx.PowerIterationFailedConvergence, TypeError):
+            sub_cent = nx.eigenvector_centrality(sub, weight="weight", max_iter=1000, tol=1e-6)
+        eigval = max(nx.adjacency_spectrum(sub, weight="weight").real)
+        cent.update({node: value * eigval for node, value in sub_cent.items()})
+
+    # Renormalise to unit length, matching eigenvector_centrality_numpy's own
+    # convention for connected graphs, so this column stays on a comparable
+    # scale to overall_centrality / nn_centrality (the per-component eigenvalue
+    # rescaling above sets each component's *relative* weight; this step just
+    # brings the combined vector back to a standard, comparable magnitude).
+    norm = np.sqrt(sum(v ** 2 for v in cent.values()))
+    if norm > 0:
+        cent = {k: v / norm for k, v in cent.items()}
+
+    print(f"  {label}: {nx.number_connected_components(G)} disconnected components, "
+          f"computed centrality per component")
+    return cent
+
+
 def safe_eigenvector_centrality(G, label=""):
     """
-    Compute weighted eigenvector centrality, falling back to power iteration
-    if numpy solver fails (e.g. disconnected graph).
+    Compute weighted eigenvector centrality, falling back to per-component
+    computation if the numpy solver fails (e.g. disconnected graph).
     Returns a dict {node: centrality_score}.
     """
     if G.number_of_nodes() == 0:
         return {}
     try:
         cent = nx.eigenvector_centrality_numpy(G, weight="weight")
+    except nx.AmbiguousSolution:
+        # Raised on disconnected graphs (e.g. the natural/intra-regional
+        # subgraph, which splits into one component per WB region).
+        cent = eigenvector_centrality_per_component(G, label)
     except nx.PowerIterationFailedConvergence:
         cent = nx.eigenvector_centrality(G, weight="weight", max_iter=1000, tol=1e-6)
     except Exception as exc:
@@ -418,8 +716,8 @@ def safe_eigenvector_centrality(G, label=""):
     return cent
 
 
-def compute_all_centralities(G, G_natural, G_nonnatural):
-    """Return three centrality dicts: overall, natural, non-natural."""
+def compute_all_centralities(G, G_natural, G_nonnatural, G_ed, G_ing):
+    """Return five centrality dicts: overall, natural, non-natural, ED, ING."""
     print("  Computing overall centrality...")
     overall = safe_eigenvector_centrality(G, "overall")
 
@@ -429,37 +727,28 @@ def compute_all_centralities(G, G_natural, G_nonnatural):
     print("  Computing natural (intra-regional) centrality...")
     n = safe_eigenvector_centrality(G_natural, "natural")
 
-    return overall, nn, n
+    print("  Computing ED (developed-partner) centrality...")
+    ed = safe_eigenvector_centrality(G_ed, "ED")
+
+    print("  Computing ING (developing-partner) centrality...")
+    ing = safe_eigenvector_centrality(G_ing, "ING")
+
+    return overall, nn, n, ed, ing
 
 
-# ── Degree statistics ─────────────────────────────────────────────────────────
+# ── Results assembly ─────────────────────────────────────────────────────────
 
-def compute_degree_stats(G, df):
-    """Compute n_agreements and n_partners per country."""
-    n_partners = dict(G.degree())
+def assemble_results(overall, nn, n, ed, ing, n_partners, income_classification=None, country_depth_stats=None):
+    """
+    Build results DataFrame from centrality dicts.
 
-    if "base_treaty" in df.columns and "iso1" in df.columns:
-        agreements = (
-            pd.concat([
-                df[["iso1", "base_treaty"]].rename(columns={"iso1": "iso"}),
-                df[["iso2", "base_treaty"]].rename(columns={"iso2": "iso"}),
-            ])
-            .drop_duplicates()
-            .groupby("iso")["base_treaty"]
-            .nunique()
-            .to_dict()
-        )
-    else:
-        agreements = {n: 1 for n in G.nodes()}
-
-    return n_partners, agreements
-
-
-# ── Results assembly ──────────────────────────────────────────────────────────
-
-def assemble_results(overall, nn, n, n_partners, n_agreements):
-    """Build results DataFrame from centrality dicts."""
-    all_countries = set(overall) | set(nn) | set(n) | set(n_partners)
+    n_agreements/avg_enforceable/max_enforceable all come from
+    country_depth_stats (WB DTA 2.0 — see load_wb_dta); n_partners comes
+    from the network's own degree (G.degree()), so both are now sourced
+    from the same WB-DTA-2.0-built graph.
+    """
+    all_countries = set(overall) | set(nn) | set(n) | set(ed) | set(ing) | set(n_partners)
+    income_classification = income_classification or {}
 
     rows = []
     for iso in all_countries:
@@ -467,17 +756,36 @@ def assemble_results(overall, nn, n, n_partners, n_agreements):
             "iso3":               iso,
             "name":               COUNTRY_NAMES.get(iso, iso),
             "region":             WB_REGION.get(iso, "Unknown"),
+            "income_group":       income_classification.get(iso, "Unknown"),
             "overall_centrality": overall.get(iso, 0.0),
             "nn_centrality":      nn.get(iso, 0.0),
             "n_centrality":       n.get(iso, 0.0),
+            "ed_centrality":      ed.get(iso, 0.0),
+            "ing_centrality":     ing.get(iso, 0.0),
             "n_partners":         n_partners.get(iso, 0),
-            "n_agreements":       n_agreements.get(iso, 0),
         })
 
     results = pd.DataFrame(rows)
 
+    # Merge in per-country agreement/provision-depth stats from WB DTA 2.0
+    # (n_agreements, avg/max enforceable provisions). Countries with no WB
+    # DTA 2.0 coverage get 0 for all three — a real "no data" value,
+    # consistent with n_partners defaulting to 0 above.
+    if country_depth_stats is not None:
+        results = results.merge(
+            country_depth_stats.rename(columns={"iso": "iso3"}),
+            on="iso3", how="left",
+        )
+        stat_cols = ["n_agreements", "avg_enforceable", "max_enforceable"]
+        results[stat_cols] = results[stat_cols].fillna(0.0)
+        results["n_agreements"] = results["n_agreements"].astype(int)
+    else:
+        results["n_agreements"] = 0
+        results["avg_enforceable"] = 0.0
+        results["max_enforceable"] = 0.0
+
     # Add ranks (1 = highest centrality)
-    for col in ["overall_centrality", "nn_centrality", "n_centrality"]:
+    for col in ["overall_centrality", "nn_centrality", "n_centrality", "ed_centrality", "ing_centrality"]:
         rank_col = col.replace("centrality", "rank")
         results[rank_col] = results[col].rank(ascending=False, method="min").astype(int)
 
@@ -493,42 +801,45 @@ def main():
     print("\n── FTA Network Centrality Pipeline ──────────────────────────────")
     print(f"Method: Fan et al. (2025) weighted eigenvector centrality")
     if args.year:
-        print(f"Sample: agreements in force ≤ {args.year}")
+        print(f"Sample: historical — agreements with goods entry-into-force ≤ {args.year}")
     else:
-        print(f"Sample: all agreements in the DESTA dataset")
+        print(f"Sample: live — agreements currently in force")
     print()
 
     # 1. Check files
     check_data_files()
 
-    # 2. Load data
+    # 2. Load data — WB DTA 2.0 is the sole source of topology, depth,
+    # n_agreements, and region classification (see CLAUDE.md Section 5,
+    # "Base network source mismatch"). DESTA has been fully retired from
+    # this file and from network_example.py.
     print("Loading data...")
-    df              = load_desta(year_filter=args.year)
-    bilateral_depth = load_dta_bilateral_depth()  # None if Excel absent
+    depth_lookup, country_depth_stats, entry_year_lookup, pair_agreements = load_wb_dta(year_filter=args.year)
+    income_classification = load_income_classification()
+    cepii_distance = load_cepii_distance()
 
     # 3. Build network
     print("\nBuilding network...")
-    depth_col = detect_depth_column(df)
-    if bilateral_depth:
-        print("  Depth source: DTA 1.0 Hofmann et al. (2017) — legally enforceable provisions")
-    else:
-        print("  Depth source: DESTA depth_index proxy (DTA 1.0 Excel not found)")
-    G = build_network(df, depth_col, bilateral_depth)
+    G = build_network(depth_lookup)
 
-    # 4. Split natural / non-natural
-    desta_regions = build_region_lookup_from_desta(df)
-    G_natural, G_nonnatural = split_natural_nonnatural(G, desta_regions)
+    # 4. Split natural / non-natural (real CEPII distance, per-country
+    # threshold — see CLAUDE.md Section 5), and developed / developing (H3)
+    natural_thresholds = compute_natural_thresholds(G, cepii_distance)
+    G_natural, G_nonnatural = split_natural_nonnatural(G, cepii_distance, natural_thresholds)
+    G_ed, G_ing = split_developed_developing(G, income_classification)
 
     # 5. Compute centrality
     print("\nComputing centrality scores...")
-    overall, nn, n = compute_all_centralities(G, G_natural, G_nonnatural)
+    overall, nn, n, ed, ing = compute_all_centralities(G, G_natural, G_nonnatural, G_ed, G_ing)
 
-    # 6. Degree statistics
-    n_partners, n_agreements = compute_degree_stats(G, df)
+    # 6. Degree statistics — n_partners comes directly from the WB-DTA-2.0-built
+    # graph's own degree; n_agreements comes from country_depth_stats (also
+    # WB DTA 2.0), merged in by assemble_results()
+    n_partners = dict(G.degree())
 
     # 7. Assemble and save
     print("\nAssembling results...")
-    results = assemble_results(overall, nn, n, n_partners, n_agreements)
+    results = assemble_results(overall, nn, n, ed, ing, n_partners, income_classification, country_depth_stats)
     results.to_csv(OUTPUT_PATH, index=False)
     print(f"  Saved: {OUTPUT_PATH}  ({len(results)} countries)")
 
@@ -541,25 +852,33 @@ def main():
     print(f"  Saved: {EDGES_PATH}  ({len(edges_df)} edges, "
           f"mean weight={edges_df['weight'].mean():.2f})")
 
+    # 8b. Save per-pair-agreement listing for the app's agreement-hover UI
+    pair_agreements.to_csv(AGREEMENTS_PATH, index=False)
+    print(f"  Saved: {AGREEMENTS_PATH}  ({len(pair_agreements)} rows)")
+
     # 8. Optional display
     if args.show:
         print("\n── Top 30 Countries by Overall Centrality ───────────────────────")
-        display = results.head(30)[["overall_rank","iso3","name","region",
+        display = results.head(30)[["overall_rank","iso3","name","region","income_group",
                                     "overall_centrality","nn_centrality","n_centrality",
+                                    "ed_centrality","ing_centrality",
                                     "n_agreements","n_partners"]]
         display = display.rename(columns={
             "overall_rank":        "Rank",
             "iso3":                "ISO3",
             "name":                "Country",
             "region":              "Region",
+            "income_group":        "Income",
             "overall_centrality":  "Overall",
             "nn_centrality":       "Non-natural",
             "n_centrality":        "Natural",
+            "ed_centrality":       "ED",
+            "ing_centrality":      "ING",
             "n_agreements":        "# Agreements",
             "n_partners":          "# Partners",
         })
         # Round floats
-        for col in ["Overall","Non-natural","Natural"]:
+        for col in ["Overall","Non-natural","Natural","ED","ING"]:
             display[col] = display[col].map(lambda x: f"{x:.4f}")
         print(display.to_string(index=False))
         print()

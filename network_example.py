@@ -1,10 +1,9 @@
 """
 network_example.py — Trade Partner Intelligence
 ================================================
-Multi-page Streamlit app with three analytical lenses:
+Streamlit app with two analytical lenses:
   1. Trade agreement network centrality  (3D force-directed graph)
   2. Economic complexity                 (ECI dashboard)
-  3. Institutional quality               (World Bank governance indicators)
 
 Run:
     conda activate trade-app && streamlit run network_example.py
@@ -14,7 +13,6 @@ import html as _html
 import json
 import math
 import os
-import random
 import statistics
 from pathlib import Path
 
@@ -332,14 +330,26 @@ METRIC_LABELS = list(METRICS.keys())
 # DATA LOADING
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Centrality scores (from centrality_pipeline.py)
-_centrality_index = {}
+# Centrality + real agreement/provision-depth stats (from centrality_pipeline.py,
+# sourced entirely from WB DTA 2.0 — see Section 5 of CLAUDE.md for provenance)
+_centrality_index      = {}
+_n_agreements_index    = {}
+_n_partners_index      = {}
+_avg_enforceable_index = {}
+_max_enforceable_index = {}
+DEPTH_MAX = 1.0  # dynamic max avg_enforceable, used to scale depth to a 0-100 score
 CENTRALITY_LOADED = False
 _cent_path = PROJECT_ROOT / "data" / "processed" / "centrality_scores.csv"
 if _cent_path.exists():
     try:
         _cent_df = pd.read_csv(_cent_path).set_index("iso3")
-        _centrality_index = _cent_df["overall_centrality"].to_dict()
+        _centrality_index      = _cent_df["overall_centrality"].to_dict()
+        _n_agreements_index    = _cent_df["n_agreements"].to_dict()
+        _n_partners_index      = _cent_df["n_partners"].to_dict()
+        _avg_enforceable_index = _cent_df["avg_enforceable"].to_dict()
+        _max_enforceable_index = _cent_df["max_enforceable"].to_dict()
+        _positive_avg_enf = [v for v in _avg_enforceable_index.values() if v and v > 0]
+        DEPTH_MAX = max(_positive_avg_enf) if _positive_avg_enf else 1.0
         CENTRALITY_LOADED = True
     except Exception:
         pass
@@ -393,7 +403,7 @@ def simulate_centrality(country_iso: str, new_partners: list[str]) -> float | No
     return round(score / new_max * 100, 1) if new_max > 0 else None
 
 
-def simulate_depth(country_iso: str, new_partners: list[str], depth_max: float = 47.0) -> tuple[float, float] | None:
+def simulate_depth(country_iso: str, new_partners: list[str], depth_max: float = DEPTH_MAX) -> tuple[float, float] | None:
     """
     Returns (simulated_avg_enforceable, simulated_depth_pct2) for country_iso
     after hypothetically signing agreements with each country in new_partners.
@@ -452,56 +462,34 @@ if _eci_path.exists():
     except Exception:
         pass
 
-# World Bank governance indicators
-_wb_path = PROJECT_ROOT / "data" / "raw" / "wb_cache.csv"
-_wb_df   = pd.DataFrame()
-if _wb_path.exists():
-    try:
-        _wb_df = pd.read_csv(_wb_path).set_index("iso3")
-    except Exception:
-        pass
-
-# FTA partner map and agreements list — built from DESTA dyadic data
+# FTA partner map and agreements list — built from WB DTA 2.0 via
+# centrality_pipeline.py's load_wb_dta() / data/processed/agreements.csv
+# (see CLAUDE.md Section 5, "Base network source mismatch")
 PARTNER_MAP: dict[str, set] = {}
 AGREEMENTS_MAP: dict[str, list] = {}   # iso3 → [{"name": str, "year": int|None}]
 PAIR_AGREEMENTS: dict[str, list] = {}  # "iso3_a|iso3_b" (sorted) → [agreement_names]
-_desta_fta_path = PROJECT_ROOT / "data" / "raw" / "desta_dyads.csv"
-if _desta_fta_path.exists():
+_agreements_path = PROJECT_ROOT / "data" / "processed" / "agreements.csv"
+if _agreements_path.exists():
     try:
-        import pycountry as _pycountry
-        _desta_raw = pd.read_csv(_desta_fta_path, encoding="latin-1",
-                                 usecols=["iso1", "iso2", "name", "entryforceyear"])
-        # Build numeric → alpha3 lookup (convert each unique numeric code once)
-        _all_nums = pd.concat([_desta_raw["iso1"], _desta_raw["iso2"]]).dropna().unique()
-        _num_map: dict = {}
-        for _n in _all_nums:
-            try:
-                _num_map[_n] = _pycountry.countries.get(
-                    numeric=str(int(float(_n))).zfill(3)
-                ).alpha_3
-            except Exception:
-                _num_map[_n] = None
-        _desta_raw["a3_1"] = _desta_raw["iso1"].map(_num_map)
-        _desta_raw["a3_2"] = _desta_raw["iso2"].map(_num_map)
-        _clean = _desta_raw.dropna(subset=["a3_1", "a3_2"])
+        _agr_df = pd.read_csv(_agreements_path)
         # Partner map (deduplicated pairs)
-        for _a, _b in zip(_clean["a3_1"], _clean["a3_2"]):
+        for _a, _b in zip(_agr_df["iso1"], _agr_df["iso2"]):
             PARTNER_MAP.setdefault(_a, set()).add(_b)
             PARTNER_MAP.setdefault(_b, set()).add(_a)
         # Agreements map — unique agreement names per country, sorted by year
-        for _, _row in _clean.iterrows():
-            _agr = str(_row["name"]).strip() if pd.notna(_row["name"]) else "Unknown"
-            _yr  = int(_row["entryforceyear"]) if pd.notna(_row["entryforceyear"]) else None
-            for _iso in [_row["a3_1"], _row["a3_2"]]:
+        for _, _row in _agr_df.iterrows():
+            _agr = str(_row["agreement"]).strip() if pd.notna(_row["agreement"]) else "Unknown"
+            _yr  = int(_row["entry_year"]) if pd.notna(_row["entry_year"]) else None
+            for _iso in [_row["iso1"], _row["iso2"]]:
                 _seen = {d["name"] for d in AGREEMENTS_MAP.get(_iso, [])}
                 if _agr not in _seen:
                     AGREEMENTS_MAP.setdefault(_iso, []).append({"name": _agr, "year": _yr})
         for _iso in AGREEMENTS_MAP:
             AGREEMENTS_MAP[_iso].sort(key=lambda d: d["year"] or 0)
         # Pair agreements — which agreements directly connect each country pair
-        for _, _row in _clean.iterrows():
-            _key = "|".join(sorted([_row["a3_1"], _row["a3_2"]]))
-            _agr = str(_row["name"]).strip() if pd.notna(_row["name"]) else "Unknown"
+        for _, _row in _agr_df.iterrows():
+            _key = "|".join(sorted([_row["iso1"], _row["iso2"]]))
+            _agr = str(_row["agreement"]).strip() if pd.notna(_row["agreement"]) else "Unknown"
             if _agr not in PAIR_AGREEMENTS.get(_key, []):
                 PAIR_AGREEMENTS.setdefault(_key, []).append(_agr)
     except Exception:
@@ -738,50 +726,19 @@ COUNTRY_LOOKUP = {c["iso3"]: c for c in COUNTRIES}
 NAME_TO_REGION_COLOR = {c["name"]: WB_REGIONS[c["region"]] for c in COUNTRIES}
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATA GENERATION (DTA illustrative values)
+# COUNTRY DATA (real: n_agreements/n_partners/avg_enforceable/max_enforceable
+# all sourced from WB DTA 2.0 — see centrality_pipeline.py and CLAUDE.md Section 5)
 # ══════════════════════════════════════════════════════════════════════════════
-
-TIER_RANGES = {
-    5: {"n_agreements":(38,52), "avg_enforceable":(27,33), "max_enforceable":(40,47), "n_partners":(80,130)},
-    4: {"n_agreements":(12,22), "avg_enforceable":(19,26), "max_enforceable":(30,41), "n_partners":(38,72)},
-    3: {"n_agreements":(7,16),  "avg_enforceable":(12,20), "max_enforceable":(22,36), "n_partners":(20,55)},
-    2: {"n_agreements":(3,11),  "avg_enforceable":(6,13),  "max_enforceable":(12,25), "n_partners":(8,32)},
-    1: {"n_agreements":(1,4),   "avg_enforceable":(2,7),   "max_enforceable":(5,14),  "n_partners":(2,10)},
-}
-
-def gen_dta(tier, seed):
-    rng = random.Random(seed)
-    return {k: rng.randint(*v) for k, v in TIER_RANGES[tier].items()}
-
-EXPLICIT_DATA = {
-    "USA": {"n_agreements":14, "avg_enforceable":25, "max_enforceable":35, "n_partners": 51},
-    "CAN": {"n_agreements":15, "avg_enforceable":24, "max_enforceable":38, "n_partners": 51},
-    "DEU": {"n_agreements":50, "avg_enforceable":31, "max_enforceable":46, "n_partners":121},
-    "FRA": {"n_agreements":50, "avg_enforceable":31, "max_enforceable":46, "n_partners":121},
-    "GBR": {"n_agreements":35, "avg_enforceable":28, "max_enforceable":44, "n_partners": 90},
-    "CHE": {"n_agreements":33, "avg_enforceable":29, "max_enforceable":43, "n_partners": 80},
-    "SGP": {"n_agreements":30, "avg_enforceable":27, "max_enforceable":41, "n_partners": 75},
-    "JPN": {"n_agreements":21, "avg_enforceable":21, "max_enforceable":38, "n_partners": 50},
-    "KOR": {"n_agreements":18, "avg_enforceable":23, "max_enforceable":40, "n_partners": 58},
-    "AUS": {"n_agreements":16, "avg_enforceable":21, "max_enforceable":35, "n_partners": 38},
-    "NZL": {"n_agreements":14, "avg_enforceable":20, "max_enforceable":34, "n_partners": 35},
-    "CHN": {"n_agreements":20, "avg_enforceable":14, "max_enforceable":28, "n_partners": 52},
-    "MEX": {"n_agreements":13, "avg_enforceable":19, "max_enforceable":35, "n_partners": 49},
-    "CHL": {"n_agreements":15, "avg_enforceable":18, "max_enforceable":34, "n_partners": 65},
-    "VNM": {"n_agreements":15, "avg_enforceable":17, "max_enforceable":35, "n_partners": 40},
-    "IND": {"n_agreements":15, "avg_enforceable":11, "max_enforceable":20, "n_partners": 32},
-    "BRA": {"n_agreements": 5, "avg_enforceable": 9, "max_enforceable":16, "n_partners": 14},
-    "ARG": {"n_agreements": 5, "avg_enforceable": 7, "max_enforceable":13, "n_partners": 11},
-    "ZAF": {"n_agreements": 5, "avg_enforceable":13, "max_enforceable":27, "n_partners": 29},
-    "NGA": {"n_agreements": 3, "avg_enforceable": 5, "max_enforceable":11, "n_partners":  7},
-    "SAU": {"n_agreements": 5, "avg_enforceable": 7, "max_enforceable":13, "n_partners": 10},
-    "IDN": {"n_agreements":10, "avg_enforceable":11, "max_enforceable":20, "n_partners": 24},
-}
 
 COUNTRY_DATA = {}
 for c in COUNTRIES:
     iso3 = c["iso3"]
-    COUNTRY_DATA[iso3] = EXPLICIT_DATA[iso3].copy() if iso3 in EXPLICIT_DATA else gen_dta(c["tier"], seed=hash(iso3) % 10000)
+    COUNTRY_DATA[iso3] = {
+        "n_agreements":    int(_n_agreements_index.get(iso3, 0)),
+        "avg_enforceable": round(float(_avg_enforceable_index.get(iso3, 0.0)), 1),
+        "max_enforceable": round(float(_max_enforceable_index.get(iso3, 0.0)), 1),
+        "n_partners":      int(_n_partners_index.get(iso3, 0)),
+    }
     COUNTRY_DATA[iso3]["overall_centrality"] = round(_centrality_index.get(iso3, 0.0), 6)
     COUNTRY_DATA[iso3]["eci_score"] = round(_eci_index[iso3], 3) if iso3 in _eci_index else None
     COUNTRY_DATA[iso3]["eci_rank"]  = int(_eci_rank[iso3])       if iso3 in _eci_rank  else None
@@ -1155,7 +1112,7 @@ def render_home():
     _centrality_sel  = _centrality_index.get(sel)
     cent_pct2        = round((_centrality_sel / _cmax2_early) * 100, 1) if _centrality_sel and _all_cent2_early else None
     _avg_depth_early = COUNTRY_DATA.get(sel, {}).get("avg_enforceable")
-    depth_pct2       = round(min(_avg_depth_early / 47 * 100, 100), 1) if _avg_depth_early is not None else None
+    depth_pct2       = round(min(_avg_depth_early / DEPTH_MAX * 100, 100), 1) if _avg_depth_early is not None else None
 
     # Complexity additionality — current partners, then simulated with new group partners
     # When centrality rises, the additionality is scaled by the centrality gain ratio:
@@ -1197,7 +1154,7 @@ def render_home():
     _cent_pct = round((_centrality / max(_all_cent)) * 100, 1) if _centrality and _all_cent else None
     _breadth_high = (_cent_pct >= 40) if _cent_pct is not None else (COUNTRY_DATA.get(sel, {}).get("n_agreements", 0) >= 10)
 
-    _depth_pct = round(min(_avg_depth / 47 * 100, 100), 1) if _avg_depth is not None else None
+    _depth_pct = round(min(_avg_depth / DEPTH_MAX * 100, 100), 1) if _avg_depth is not None else None
     _depth_high = (_depth_pct >= 45) if _depth_pct is not None else False
 
     if _eff_peci is None:
@@ -1420,14 +1377,13 @@ def render_home():
     total_eci  = len(_eci_index)
     centrality = _centrality_index.get(sel)
     avg_depth  = COUNTRY_DATA.get(sel, {}).get("avg_enforceable")
-    is_explicit = sel in EXPLICIT_DATA
+    has_dta_coverage = bool(avg_depth)  # False for countries with no WB DTA 2.0 agreement coverage
 
     _all_cent2 = [v for v in _centrality_index.values() if v > 0]
     _cmax2     = max(_all_cent2) if _all_cent2 else 1.0
     cent_pct2  = round((centrality / _cmax2) * 100, 1) if centrality and _all_cent2 else None
     cc = COLOR_GREEN if cent_pct2 and cent_pct2 >= 60 else (COLOR_ORANGE if cent_pct2 and cent_pct2 >= 25 else COLOR_RED)
 
-    DEPTH_MAX  = 47
     depth_pct2 = round(min(avg_depth / DEPTH_MAX * 100, 100), 1) if avg_depth is not None else None
     dc = COLOR_GREEN if depth_pct2 and depth_pct2 >= 60 else (COLOR_ORANGE if depth_pct2 and depth_pct2 >= 30 else COLOR_RED)
 
@@ -1489,12 +1445,12 @@ def render_home():
             _disp_exp_note = "additionality unavailable"
     else:
         _disp_agr_val  = str(len(agreements))
-        _disp_agr_note = "hover to view list · DESTA records"
+        _disp_agr_note = "hover to view list · WB DTA 2.0 records"
         _disp_cent_val = f"{cent_pct2} / 100" if cent_pct2 is not None else "N/A"
         _cc2 = cc
         _disp_cent_note = "hover for detail · % of max eigenvector centrality"
         _disp_depth_val = f"{depth_pct2} / 100" if depth_pct2 is not None else "N/A"
-        _disp_depth_note = "hover for detail · " + ("verified" if is_explicit else "illustrative")
+        _disp_depth_note = "hover for detail · " + ("WB DTA 2.0" if has_dta_coverage else "no WB DTA 2.0 match")
         _disp_exp_val  = f"{_avg_peci:.2f}" if _avg_peci is not None else "N/A"
         _pc2 = pc
         _disp_exp_note = "hover for detail · complexity additionality from more complex partners"
@@ -1511,7 +1467,7 @@ def render_home():
             f'margin-left:12px;">{a["year"] if a["year"] else "—"}</span></div>'
             for a in agreements
         ) if agreements
-        else '<div style="padding:14px 12px;color:#aaa;font-size:12.5px;">No DESTA records found.</div>'
+        else '<div style="padding:14px 12px;color:#aaa;font-size:12.5px;">No WB DTA 2.0 records found.</div>'
     )
 
     # Card 2 — centrality: FTA partners ranked by their own centrality
@@ -1935,111 +1891,6 @@ def _unused():
         'but requires manual download.</div>',
         unsafe_allow_html=True,
     )
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE — INSTITUTIONAL QUALITY
-# ══════════════════════════════════════════════════════════════════════════════
-
-def render_institutional():
-    sel = st.session_state["country"]
-    sel_name = COUNTRY_LOOKUP[sel]["name"] if sel and sel in COUNTRY_LOOKUP else None
-
-    title_suffix = f" · <span style='color:{COLOR_GREEN};'>{sel_name}</span>" if sel_name else ""
-    st.markdown(
-        f'<div class="page-title" style="font-size:36px;">Institutional Quality{title_suffix}</div>'
-        f'<div class="page-sub">How effectively does this country implement its commitments? '
-        f'Source: World Bank Worldwide Governance Indicators.</div>',
-        unsafe_allow_html=True,
-    )
-
-    INDICATORS = {
-        "rule_of_law":         "Rule of Law",
-        "regulatory_quality":  "Regulatory Quality",
-        "govt_effectiveness":  "Government Effectiveness",
-        "control_corruption":  "Control of Corruption",
-    }
-
-    if _wb_df.empty:
-        st.warning("Governance data not loaded. Check that data/raw/wb_cache.csv exists.")
-        return
-
-    if sel and sel in _wb_df.index:
-        row = _wb_df.loc[sel]
-
-        # Stat cards
-        cols = st.columns(len(INDICATORS))
-        for col, (key, label) in zip(cols, INDICATORS.items()):
-            val = row.get(key)
-            if pd.notna(val):
-                colour = COLOR_GREEN if val >= 60 else (COLOR_ORANGE if val >= 40 else COLOR_RED)
-                col.markdown(
-                    f'<div class="stat-card" style="border-left-color:{colour};">'
-                    f'<div class="stat-label">{label}</div>'
-                    f'<div class="stat-value" style="color:{colour};">{val:.1f}</div>'
-                    f'<div class="stat-sub">Percentile rank (0–100)</div>'
-                    f'</div>', unsafe_allow_html=True,
-                )
-            else:
-                col.markdown(
-                    f'<div class="stat-card"><div class="stat-label">{label}</div>'
-                    f'<div class="stat-value" style="font-size:18px;color:#ccc;">N/A</div>'
-                    f'</div>', unsafe_allow_html=True,
-                )
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Bar chart comparing selected country against all in wb_cache
-        st.markdown(
-            f'<p style="font-size:14px;font-weight:600;color:{COLOR_BLUE};margin-bottom:8px;">'
-            f'Governance scores — {sel_name} vs all available countries</p>',
-            unsafe_allow_html=True,
-        )
-        name_map = {c["iso3"]: c["name"] for c in COUNTRIES}
-        chart_df = _wb_df[list(INDICATORS.keys())].copy()
-        chart_df.index.name = "iso3"
-        chart_df = chart_df.reset_index()
-        chart_df["name"] = chart_df["iso3"].map(name_map).fillna(chart_df["iso3"])
-        chart_df["avg"]  = chart_df[list(INDICATORS.keys())].mean(axis=1)
-        chart_df = chart_df.sort_values("avg", ascending=True)
-
-        bar_colours = [COLOR_ORANGE if iso == sel else COLOR_BLUE for iso in chart_df["iso3"]]
-
-        fig = go.Figure(go.Bar(
-            x=chart_df["avg"],
-            y=chart_df["name"],
-            orientation="h",
-            marker_color=bar_colours,
-            text=chart_df["avg"].map(lambda x: f"{x:.1f}"),
-            textposition="outside",
-            hovertemplate="%{y}: %{x:.1f}<extra></extra>",
-        ))
-        fig.update_layout(
-            height=max(400, len(chart_df) * 22),
-            margin=dict(l=10, r=60, t=10, b=10),
-            paper_bgcolor="white", plot_bgcolor="white",
-            xaxis=dict(title="Average governance percentile (0–100)",
-                       range=[0, 110], gridcolor="#f0f0f0"),
-            yaxis=dict(tickfont=dict(size=11)),
-            font=dict(family="Arial"),
-            showlegend=False,
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif sel:
-        st.info(
-            f"Governance data is not yet available for {sel_name or sel} in the local cache. "
-            f"Re-run pipeline.py to fetch updated World Bank data."
-        )
-
-    if not sel:
-        st.info("Select a country on the home page to view its governance profile.")
-
-    st.markdown(
-        '<div class="data-note">Source: World Bank Worldwide Governance Indicators (WGI). '
-        'Scores are percentile ranks (0 = lowest, 100 = highest). '
-        'Data covers ~60 countries currently in the local cache.</div>',
-        unsafe_allow_html=True,
-    )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RENDER
