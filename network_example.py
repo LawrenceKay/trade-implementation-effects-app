@@ -9,11 +9,13 @@ Run:
     conda activate trade-app && streamlit run network_example.py
 """
 
+import base64
 import html as _html
 import json
 import math
 import os
 import statistics
+from io import BytesIO
 from pathlib import Path
 
 import networkx as nx
@@ -21,6 +23,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE CONFIG
@@ -37,11 +40,39 @@ st.set_page_config(
 # ══════════════════════════════════════════════════════════════════════════════
 
 COLOR_GREEN  = "#00A651"
-COLOR_BLUE   = "#004B87"
+COLOR_BLUE   = "#004B87"   # solid fills only (badges, active pills) — dark navy, white text on top
+COLOR_CYAN   = "#4DD8E8"   # accent pulled from the backdrop image's particle wave;
+                            # used wherever text needs to read against a dark glass panel
 COLOR_ORANGE = "#F7941D"
-COLOR_RED    = "#C0392B"
+COLOR_RED    = "#E8564B"   # brightened from the original #C0392B for legibility on dark panels
+COLOR_TEAL   = "#85D6E9"   # sampled directly from the backdrop image's brightest dot pixels
+                            # (avg of top 5% brightness); used for the country-selection and
+                            # trade-partners boxes, which were previously brand green
 
 PROJECT_ROOT = Path(__file__).parent
+
+
+@st.cache_data(show_spinner=False)
+def _load_backdrop_b64() -> str:
+    """Down-scale and base64-encode the app's backdrop image, once per server process.
+
+    The source file in assets/ is a huge 8750x12667px original (2.3MB) — a
+    browser background only ever needs to be as wide as the viewport, so we
+    resize before embedding it as a CSS data URI (avoids needing a separate
+    static-file server, and keeps the page payload reasonable).
+    """
+    img_path = PROJECT_ROOT / "assets" / "visax-FpkeKQlgJtI-unsplash.jpg"
+    img = Image.open(img_path)
+    max_w = 1920
+    if img.width > max_w:
+        ratio = max_w / img.width
+        img = img.resize((max_w, round(img.height * ratio)), Image.LANCZOS)
+    buf = BytesIO()
+    img.convert("RGB").save(buf, format="JPEG", quality=78)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+BACKDROP_B64 = _load_backdrop_b64()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CSS
@@ -49,19 +80,61 @@ PROJECT_ROOT = Path(__file__).parent
 
 st.markdown(f"""
 <style>
+  :root {{
+    --panel-bg: rgba(11, 17, 25, 0.70);
+    --panel-bg-solid: #0e161f;
+    --panel-border: {COLOR_TEAL};
+    --divider: rgba(255,255,255,0.10);
+    --text-primary: #EAF1F7;
+    --text-secondary: #A9BAC8;
+    --text-muted: #7C8FA0;
+  }}
+
   /* ── Global ──────────────────────────────────────────────────────────────── */
   header[data-testid="stHeader"], [data-testid="stHeader"] {{ display:none !important; }}
   .stAppDeployButton {{ display:none !important; }}
   [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display:none !important; }}
-  .stApp, [data-testid="stAppViewContainer"],
-  [data-testid="stAppViewBlockContainer"], .main,
-  .block-container {{ background-color:#ffffff !important; }}
-  .block-container {{ padding-top:1.5rem; padding-bottom:2rem; }}
-  hr {{ border-color:{COLOR_GREEN}44 !important; }}
 
-  /* ── Sidebar ─────────────────────────────────────────────────────────────── */
+  /* Backdrop image — fixed, covers the viewport, dark scrim for legibility.
+     background-attachment:fixed means whatever crop shows here is what's
+     visible behind the page at every scroll depth, so the vertical position
+     is tuned to keep the source photo's particle-wave feature in frame
+     rather than cropping to its (mostly black) top band. */
+  .stApp {{
+    background-image:
+      linear-gradient(180deg, rgba(3,6,10,.55) 0%, rgba(3,6,10,.30) 35%, rgba(3,6,10,.38) 70%, rgba(3,6,10,.70) 100%),
+      url("data:image/jpeg;base64,{BACKDROP_B64}");
+    background-size: cover;
+    background-position: center 38%;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }}
+  [data-testid="stAppViewContainer"],
+  [data-testid="stAppViewBlockContainer"], .main,
+  .block-container {{ background-color: transparent !important; }}
+  .block-container {{ padding-top:1.5rem; padding-bottom:2rem; }}
+  .block-container, .block-container p, .block-container span,
+  .block-container div, .block-container label {{ color: var(--text-primary); }}
+  hr {{ border-color:{COLOR_TEAL} !important; }}
+
+  /* ── Bordered containers (st.container(border=True)) — dark glass panels ──── */
+  /* This Streamlit version has no data-testid="stVerticalBlockBorderWrapper" —
+     border=True containers render as a plain [data-testid="stVerticalBlock"]
+     with Streamlit's own default border. [height="420px"] scopes this to
+     just the two bordered containers on the analysis page (both explicitly
+     use that height) without also styling every other stVerticalBlock. */
+  [data-testid="stVerticalBlock"][height="420px"] {{
+    background: var(--panel-bg) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 10px !important;
+  }}
+
+  /* ── Sidebar (currently hidden via display:none above; kept in step with the
+       dark theme in case it's re-enabled) ─────────────────────────────────── */
   [data-testid="stSidebar"],
-  [data-testid="stSidebarContent"] {{ background-color:#f8f9fa !important; }}
+  [data-testid="stSidebarContent"] {{ background-color: var(--panel-bg-solid) !important; }}
 
   /* Nav section buttons */
   section[data-testid="stSidebar"] .stButton > button {{
@@ -75,7 +148,7 @@ st.markdown(f"""
     white-space: normal !important;
     line-height: 1.4 !important;
     width: 100% !important;
-    background-color: white !important;
+    background-color: var(--panel-bg-solid) !important;
     color: {COLOR_GREEN} !important;
     border: 2px solid {COLOR_GREEN} !important;
     box-shadow: none !important;
@@ -88,7 +161,7 @@ st.markdown(f"""
   /* Sidebar description text */
   .sidebar-desc {{
     font-size: 11.5px;
-    color: #666;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin: 6px 0 16px 2px;
     padding-left: 2px;
@@ -107,18 +180,24 @@ st.markdown(f"""
   }}
   .country-region {{
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     margin-bottom: 10px;
   }}
 
   /* ── Home page ───────────────────────────────────────────────────────────── */
-  .page-title  {{ font-size:48px; font-weight:700; color:#000; margin-bottom:4px; }}
-  .page-sub    {{ font-size:15px; color:#555; margin-bottom:28px; }}
+  /* !important on color: the generic .block-container div default-text rule
+     earlier in this block outranks a bare single-class selector like .page-title
+     on specificity, and would otherwise silently win regardless of source order. */
+  .page-title  {{ font-size:48px; font-weight:700; color:{COLOR_TEAL} !important; margin-bottom:4px;
+    text-shadow: 0 2px 14px rgba(0,0,0,.6); }}
+  .page-sub    {{ font-size:15px; color:var(--text-primary); margin-bottom:28px; }}
 
   .concept-card {{
     border-top: 4px solid {COLOR_GREEN};
-    background: #fafafa;
+    background: var(--panel-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-radius: 0 0 6px 6px;
     padding: 20px 18px 18px;
     height: 100%;
@@ -126,14 +205,14 @@ st.markdown(f"""
   .concept-card h3 {{
     font-size: 14px;
     font-weight: 700;
-    color: {COLOR_BLUE};
+    color: {COLOR_CYAN};
     margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: .04em;
   }}
   .concept-card p {{
     font-size: 13px;
-    color: #444;
+    color: var(--text-secondary);
     line-height: 1.7;
   }}
 
@@ -146,7 +225,7 @@ st.markdown(f"""
     font-weight: 600;
     cursor: pointer;
     border: 2px solid {COLOR_GREEN};
-    background: white;
+    background: var(--panel-bg-solid);
     color: {COLOR_GREEN};
     transition: all .15s;
   }}
@@ -162,7 +241,7 @@ st.markdown(f"""
     font-size: 12.5px !important;
     font-weight: 600 !important;
     padding: 6px 18px !important;
-    background: white !important;
+    background: var(--panel-bg-solid) !important;
     color: {COLOR_GREEN} !important;
     border: 2px solid {COLOR_GREEN} !important;
     box-shadow: none !important;
@@ -191,9 +270,9 @@ st.markdown(f"""
     background-color: #008a44 !important;
     border-color:     #008a44 !important;
   }}
-  /* Sidebar inactive nav buttons — explicitly white with green border */
+  /* Sidebar inactive nav buttons — dark glass with green border */
   body section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-secondary"] {{
-    background-color: white !important;
+    background-color: var(--panel-bg-solid) !important;
     border-color:     {COLOR_GREEN} !important;
     color: {COLOR_GREEN} !important;
     font-weight: 600 !important;
@@ -217,33 +296,48 @@ st.markdown(f"""
     fill: white !important;
   }}
 
-  /* ── Dropdown menu portal — green text on white ──────────────────────────── */
+  /* ── Dropdown menu portal — teal text on dark glass ───────────────────────── */
+  /* Streamlit's BaseWeb select popover in this version carries no
+     data-baseweb="menu" attribute — the real, stable hook is the testid on
+     the virtualized option list. Kept the old data-baseweb="menu" selectors
+     alongside it in case a future Streamlit version restores that markup. */
+  body [data-testid="stSelectboxVirtualDropdown"],
   body [data-baseweb="menu"],
   [data-baseweb="popover"] [data-baseweb="menu"] {{
-    background-color: white !important;
-    color: {COLOR_GREEN} !important;
+    background-color: var(--panel-bg-solid) !important;
+    color: {COLOR_TEAL} !important;
   }}
+  body [data-testid="stSelectboxVirtualDropdown"] li,
+  body [data-testid="stSelectboxVirtualDropdown"] [role="option"],
   body [data-baseweb="menu"] li,
   body [data-baseweb="menu"] [role="option"],
   body [data-baseweb="menu"] ul > * {{
-    background-color: white !important;
-    color: {COLOR_GREEN} !important;
+    background-color: var(--panel-bg-solid) !important;
+    color: {COLOR_TEAL} !important;
   }}
+  body [data-testid="stSelectboxVirtualDropdown"] li *,
+  body [data-testid="stSelectboxVirtualDropdown"] [role="option"] *,
   body [data-baseweb="menu"] li *,
   body [data-baseweb="menu"] [role="option"] * {{
-    color: {COLOR_GREEN} !important;
+    color: {COLOR_TEAL} !important;
     background-color: transparent !important;
   }}
+  body [data-testid="stSelectboxVirtualDropdown"] li:hover,
+  body [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+  body [data-testid="stSelectboxVirtualDropdown"] [aria-selected="true"],
   body [data-baseweb="menu"] li:hover,
   body [data-baseweb="menu"] [role="option"]:hover,
   body [data-baseweb="menu"] [aria-selected="true"] {{
-    background-color: {COLOR_GREEN} !important;
-    color: white !important;
+    background-color: {COLOR_TEAL} !important;
+    color: #0B1C24 !important;
   }}
+  body [data-testid="stSelectboxVirtualDropdown"] li:hover *,
+  body [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover *,
+  body [data-testid="stSelectboxVirtualDropdown"] [aria-selected="true"] *,
   body [data-baseweb="menu"] li:hover *,
   body [data-baseweb="menu"] [role="option"]:hover *,
   body [data-baseweb="menu"] [aria-selected="true"] * {{
-    color: white !important;
+    color: #0B1C24 !important;
     background-color: transparent !important;
   }}
 
@@ -254,61 +348,65 @@ st.markdown(f"""
     font-size: 28px !important;
     font-weight: 700 !important;
     min-height: 56px !important;
-    border-color: {COLOR_GREEN} !important;
+    border-color: {COLOR_TEAL} !important;
     border-width: 2px !important;
     border-radius: 6px !important;
-    background-color: {COLOR_GREEN} !important;
+    background-color: {COLOR_TEAL} !important;
     padding-left: 14px !important;
   }}
   .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value"],
   .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value"] * {{
     font-size: 28px !important;
     font-weight: 700 !important;
-    color: white !important;
+    color: #0B1C24 !important;
   }}
   .block-container [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-placeholder"] {{
     font-size: 28px !important;
     font-weight: 700 !important;
-    color: rgba(255,255,255,0.7) !important;
+    color: rgba(11,28,36,0.65) !important;
   }}
   .block-container [data-testid="stSelectbox"] [data-baseweb="select"] input {{
     font-size: 28px !important;
     font-weight: 700 !important;
-    color: white !important;
+    color: #0B1C24 !important;
   }}
   .block-container [data-testid="stSelectbox"] [data-baseweb="select"] svg {{
     width: 22px !important;
     height: 22px !important;
-    fill: white !important;
+    fill: #0B1C24 !important;
   }}
 
   /* ── Assess a group multiselect — compact, easy to browse and add from ────── */
   .block-container [data-testid="stMultiSelect"] [data-baseweb="select"] > div {{
     min-height: 38px !important;
-    border-color: {COLOR_GREEN} !important;
+    border-color: {COLOR_TEAL} !important;
+    background-color: var(--panel-bg) !important;
   }}
   .block-container [data-testid="stMultiSelect"] [data-baseweb="select"] input {{
     font-size: 14px !important;
+    color: var(--text-primary) !important;
   }}
 
   /* ── Data note ───────────────────────────────────────────────────────────── */
   .data-note {{
-    background:#FFF8F0; border-left:4px solid {COLOR_ORANGE};
+    background: rgba(247,148,29,0.12); border-left:4px solid {COLOR_ORANGE};
     padding:.7rem 1rem; border-radius:4px; font-size:.82rem;
-    color:#555; margin-top:1rem;
+    color: var(--text-secondary); margin-top:1rem;
   }}
 
   /* ── Stat cards ──────────────────────────────────────────────────────────── */
   .stat-card {{
-    background: #f8f9fa;
-    border-left: 4px solid {COLOR_BLUE};
+    background: var(--panel-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-left: 4px solid {COLOR_CYAN};
     border-radius: 0 6px 6px 0;
     padding: 14px 18px;
     margin-bottom: 10px;
   }}
-  .stat-card .stat-label {{ font-size:11px; color:#888; text-transform:uppercase; letter-spacing:.05em; }}
-  .stat-card .stat-value {{ font-size:28px; font-weight:700; color:{COLOR_BLUE}; line-height:1.2; }}
-  .stat-card .stat-sub   {{ font-size:12px; color:#555; margin-top:2px; }}
+  .stat-card .stat-label {{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }}
+  .stat-card .stat-value {{ font-size:28px; font-weight:700; color:{COLOR_CYAN}; line-height:1.2; }}
+  .stat-card .stat-sub   {{ font-size:12px; color:var(--text-secondary); margin-top:2px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -511,14 +609,17 @@ if PARTNER_MAP:
 # ══════════════════════════════════════════════════════════════════════════════
 
 WB_REGIONS = {
-    "East Asia and Pacific":        "#1A6FB5",  # strong blue
-    "Europe and Central Asia":      "#8E44AD",  # purple
-    "Latin America and Caribbean":  "#D35400",  # burnt orange
-    "Middle East and North Africa": "#C0A010",  # gold
-    "North America":                "#1B4F72",  # dark navy
-    "South Asia":                   "#C0392B",  # red
-    "Sub-Saharan Africa":           "#117A65",  # dark teal
+    "East Asia and Pacific":        "#2F8FDB",  # strong blue
+    "Europe and Central Asia":      "#B07CE0",  # purple
+    "Latin America and Caribbean":  "#F0813C",  # burnt orange
+    "Middle East and North Africa": "#E0C23A",  # gold
+    "North America":                "#6E93BE",  # steel blue — distinct from the brighter East Asia blue
+    "South Asia":                   "#E056A0",  # magenta — was red, changed to avoid clashing with red status colours
+    "Sub-Saharan Africa":           "#28B79A",  # teal
 }
+# Brightened from the original set (dark navy/dark teal/muted brick red) which
+# was tuned for a white background — see "Consider how to recolour the app" /
+# the backdrop-image styling task in CLAUDE.md Section 5.
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COUNTRIES  (~180 WB members)
@@ -762,6 +863,7 @@ components.html(f"""
 <script>
 (function() {{
   const GREEN = '{COLOR_GREEN}';
+  const ACCENT = '{COLOR_TEAL}';  // country-selection / partners dropdown accent
   const doc = window.parent.document;
 
   // Inject a <style> tag directly into the parent document so it
@@ -770,16 +872,16 @@ components.html(f"""
     const s = doc.createElement('style');
     s.id = 'app-menu-style';
     s.textContent = `
-      [data-baseweb="menu"] {{ background: white !important; }}
-      [data-baseweb="menu"] * {{ color: ${{GREEN}} !important; background: transparent !important; }}
+      [data-baseweb="menu"] {{ background: #0e161f !important; }}
+      [data-baseweb="menu"] * {{ color: ${{ACCENT}} !important; background: transparent !important; }}
       [data-baseweb="menu"] li,
-      [data-baseweb="menu"] [role="option"] {{ background: white !important; color: ${{GREEN}} !important; }}
+      [data-baseweb="menu"] [role="option"] {{ background: #0e161f !important; color: ${{ACCENT}} !important; }}
       [data-baseweb="menu"] li:hover,
       [data-baseweb="menu"] [role="option"]:hover {{
-        background: ${{GREEN}} !important; color: white !important;
+        background: ${{ACCENT}} !important; color: #0B1C24 !important;
       }}
       [data-baseweb="menu"] li:hover *,
-      [data-baseweb="menu"] [role="option"]:hover * {{ color: white !important; background: transparent !important; }}
+      [data-baseweb="menu"] [role="option"]:hover * {{ color: #0B1C24 !important; background: transparent !important; }}
     `;
     doc.head.appendChild(s);
   }}
@@ -808,10 +910,10 @@ components.html(f"""
   }}
 
   function applyMenuStyles(menu) {{
-    menu.style.setProperty('background', 'white', 'important');
+    menu.style.setProperty('background', '#0e161f', 'important');
     menu.querySelectorAll('*').forEach(el => {{
       el.style.setProperty('background', 'transparent', 'important');
-      el.style.setProperty('color', GREEN, 'important');
+      el.style.setProperty('color', ACCENT, 'important');
     }});
   }}
 
@@ -825,17 +927,17 @@ components.html(f"""
 
     menu.querySelectorAll('li, [role="option"]').forEach(opt => {{
       opt.addEventListener('mouseenter', () => {{
-        opt.style.setProperty('background', GREEN, 'important');
+        opt.style.setProperty('background', ACCENT, 'important');
         opt.querySelectorAll('*').forEach(el => {{
           el.style.setProperty('background', 'transparent', 'important');
-          el.style.setProperty('color', 'white', 'important');
+          el.style.setProperty('color', '#0B1C24', 'important');
         }});
       }});
       opt.addEventListener('mouseleave', () => {{
-        opt.style.setProperty('background', 'white', 'important');
+        opt.style.setProperty('background', '#0e161f', 'important');
         opt.querySelectorAll('*').forEach(el => {{
           el.style.setProperty('background', 'transparent', 'important');
-          el.style.setProperty('color', GREEN, 'important');
+          el.style.setProperty('color', ACCENT, 'important');
         }});
       }});
     }});
@@ -849,8 +951,8 @@ components.html(f"""
     styleSelectControl();
     mutations.forEach(m => m.addedNodes.forEach(node => {{
       if (node.nodeType !== 1) return;
-      if (node.dataset && node.dataset.baseweb === 'menu') styleMenu(node);
-      node.querySelectorAll && node.querySelectorAll('[data-baseweb="menu"]').forEach(styleMenu);
+      if (node.dataset && (node.dataset.baseweb === 'menu' || node.dataset.testid === 'stSelectboxVirtualDropdown')) styleMenu(node);
+      node.querySelectorAll && node.querySelectorAll('[data-baseweb="menu"], [data-testid="stSelectboxVirtualDropdown"]').forEach(styleMenu);
     }}));
   }});
   observer.observe(doc.body, {{ childList: true, subtree: true }});
@@ -914,6 +1016,13 @@ def _build_globe_html(sel, sel_partners, intro_mode=False,
         f'<span class="leg-item"><span class="leg-dot" style="background:{colour};"></span>{region}</span>'
         for region, colour in WB_REGIONS.items()
     )
+    # Light orange — matches the groupNeighbours node colour below (countries
+    # reached via an extended/second-degree link through the simulated group,
+    # not a WB region, so kept out of WB_REGIONS itself).
+    legend_items_html += (
+        '<span class="leg-item"><span class="leg-dot" style="background:#fbd49c;">'
+        '</span>Extended connections</span>'
+    )
     legend_display = "none" if intro_mode else "flex"
     show_panel     = "false" if intro_mode else "true"
 
@@ -922,9 +1031,9 @@ def _build_globe_html(sel, sel_partners, intro_mode=False,
 <script src="https://unpkg.com/3d-force-graph@1/dist/3d-force-graph.min.js"></script>
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  body {{ background:#fff; font-family:Arial,sans-serif; }}
+  body {{ background:#05080c; font-family:Arial,sans-serif; }}
   #graph-container {{ width:100%; height:{container_h}px; position:relative;
-    border:1px solid #e0e4ea; border-radius:4px; overflow:hidden; }}
+    border:1px solid {COLOR_TEAL}; border-radius:4px; overflow:hidden; }}
   #left-panels {{
     position:absolute; top:12px; left:12px;
     display:flex; flex-direction:column; gap:10px;
@@ -932,30 +1041,32 @@ def _build_globe_html(sel, sel_partners, intro_mode=False,
   }}
   #legend {{
     display:{legend_display}; flex-direction:column; gap:10px;
-    background:rgba(255,255,255,0.92); border-radius:4px;
+    background:rgba(14,22,31,0.85); border:1px solid {COLOR_TEAL};
+    border-radius:4px;
     padding:14px 20px;
-    font-size:17px; color:#333; font-weight:500;
+    font-size:17px; color:#EAF1F7; font-weight:500;
   }}
   #node-panel {{
-    background:rgba(255,255,255,0.97);
+    background:rgba(14,22,31,0.92);
+    border:1px solid {COLOR_TEAL};
     border-left:4px solid {COLOR_GREEN};
     border-radius:0 4px 4px 0;
-    box-shadow:0 2px 10px rgba(0,0,0,.10);
+    box-shadow:0 2px 14px rgba(0,0,0,.4);
     padding:14px 18px; min-width:200px;
     font-size:12.5px; line-height:1.6; display:none;
     pointer-events:auto;
   }}
-  #node-panel h3 {{ font-size:13px; font-weight:700; color:{COLOR_BLUE};
+  #node-panel h3 {{ font-size:13px; font-weight:700; color:{COLOR_CYAN};
     text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }}
   .np-row {{ display:flex; justify-content:space-between; gap:12px;
-    border-bottom:1px solid #f0f2f5; padding:4px 0; }}
-  .np-row span:first-child {{ color:#666; }}
-  .np-row span:last-child {{ font-weight:700; color:{COLOR_BLUE}; }}
+    border-bottom:1px solid rgba(255,255,255,0.10); padding:4px 0; }}
+  .np-row span:first-child {{ color:#A9BAC8; }}
+  .np-row span:last-child {{ font-weight:700; color:{COLOR_CYAN}; }}
   .np-agr {{ margin-top:8px; }}
-  .np-agr-title {{ font-size:11px; font-weight:700; color:#888;
+  .np-agr-title {{ font-size:11px; font-weight:700; color:#7C8FA0;
     text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }}
-  .np-agr-item {{ font-size:11.5px; color:#444; padding:2px 0;
-    border-bottom:1px solid #f5f5f5; }}
+  .np-agr-item {{ font-size:11.5px; color:#D7E2EA; padding:2px 0;
+    border-bottom:1px solid rgba(255,255,255,0.06); }}
   .scene-nav-info {{ display:none !important; }}
   .leg-item {{ display:flex; align-items:center; gap:10px; white-space:nowrap; }}
   .leg-dot {{ width:16px; height:16px; border-radius:50%; flex-shrink:0; }}
@@ -1006,7 +1117,7 @@ function showNodePanel(node) {{
       + agrs.map(a => `<div class="np-agr-item">${{a}}</div>`).join('')
       + '</div>'
     : '<div class="np-agr"><div class="np-agr-title">Shared trade agreements</div>'
-      + '<div style="font-size:11.5px;color:#aaa;">No direct agreement</div></div>';
+      + '<div style="font-size:11.5px;color:#7C8FA0;">No direct agreement</div></div>';
 
   panel.innerHTML =
     `<h3>${{node.name}}</h3>`
@@ -1020,17 +1131,17 @@ function showNodePanel(node) {{
 const Graph = ForceGraph3D()(document.getElementById('graph'))
   .width(document.getElementById('graph-container').clientWidth)
   .height({graph_h})
-  .backgroundColor('#ffffff')
+  .backgroundColor('#05080c')
   .graphData(graphData)
   .nodeId('id').nodeLabel('name').nodeVal('val')
   .nodeOpacity(0.92).nodeResolution(16)
   .nodeColor(node => {{
-    if (!selectedIso) return '#cccccc';
+    if (!selectedIso) return '#8a97a3';
     if (node.id === selectedIso) return '{COLOR_GREEN}';
     if (partnerIsos.has(node.id)) return node.regionColor;
     if (groupIsos.has(node.id)) return '{COLOR_ORANGE}';
     if (groupNeighbours.has(node.id)) return '#fbd49c';
-    return '#cccccc';
+    return '#8a97a3';
   }})
   .nodeVal(node => {{
     if (node.id === selectedIso) return node.val;
@@ -1051,11 +1162,11 @@ const Graph = ForceGraph3D()(document.getElementById('graph'))
     const s = nodeId(link.source), t = nodeId(link.target);
     const sIsSel   = s === selectedIso || t === selectedIso;
     const sIsGroup = groupIsos.has(s)  || groupIsos.has(t);
-    if (!selectedIso) return '#e4e4e4';
+    if (!selectedIso) return '#4a5865';
     if (sIsSel && sIsGroup) return '{COLOR_ORANGE}';  // selected ↔ group
     if (sIsSel)             return '{COLOR_GREEN}';   // selected ↔ FTA partner
     if (sIsGroup)           return '#f5c07a';        // group country's network
-    return '#e8e8e8';
+    return '#414c57';
   }})
   .onNodeClick(node => showNodePanel(node))
   .onNodeHover(node => {{ document.body.style.cursor = node ? 'pointer' : 'default'; }});
@@ -1080,7 +1191,7 @@ def render_home():
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div style="font-size:15px;color:#666;margin-top:2px;">'
+        '<div style="font-size:17px;color:#EAF1F7;margin-top:2px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
         'Countries that place themselves in networks of trade agreements that contain deep and sophisticated '
         'production capabilities are likely to grow faster. Use the app to learn how your countries of '
         'interest can do so.'
@@ -1168,22 +1279,48 @@ def render_home():
 
     if _breadth_high and _depth_high:
         _type_label = "Deep integrator"
-        _type_colour = COLOR_GREEN
     elif _breadth_high and not _depth_high:
         _type_label = "Broadly connected, shallow commitments"
-        _type_colour = COLOR_ORANGE
     elif not _breadth_high and _depth_high:
         _type_label = "Selective but deep integrator"
-        _type_colour = COLOR_BLUE
     else:
         _type_label = "Early-stage integrator"
-        _type_colour = COLOR_RED
+
+    # ── Recommended partners — computed here (rather than down by the section
+    # that displays them) so the analysis paragraph above can also name each
+    # metric's top pick. ───────────────────────────────────────────────────
+    _depth_cands, _cent_cands, _eci_cands = [], [], []
+    if sel:
+        _non_partners = [
+            iso for iso in _all_iso3s
+            if iso != sel and iso not in sel_partners
+        ]
+        _all_cent_r = [v for v in _centrality_index.values() if v > 0]
+        _cmax_r     = max(_all_cent_r) if _all_cent_r else 1.0
+        for _iso in _non_partners:
+            _name = COUNTRY_LOOKUP.get(_iso, {}).get("name", _iso)
+            _n_agr = len(AGREEMENTS_MAP.get(_iso, []))
+            if _n_agr:
+                _depth_cands.append((_name, _n_agr))
+            _c = _centrality_index.get(_iso)
+            if _c is not None:
+                _cent_cands.append((_name, round(_c / _cmax_r * 100, 1)))
+            _e = _eci_index.get(_iso)
+            if _e is not None:
+                _eci_cands.append((_name, _e))
+        _depth_cands.sort(key=lambda x: x[1], reverse=True)
+        _cent_cands.sort(key=lambda x: x[1],  reverse=True)
+        _eci_cands.sort(key=lambda x: x[1],   reverse=True)
+
+    _top_depth_name = _depth_cands[0][0] if _depth_cands else None
+    _top_cent_name  = _cent_cands[0][0]  if _cent_cands  else None
+    _top_eci_name   = _eci_cands[0][0]   if _eci_cands   else None
 
     # ── Full-width: selectbox + integration profile ───────────────────────────
     cur_idx = _all_iso3s.index(sel) if sel in _all_iso3s else None
     st.markdown(
-        f'<p style="font-size:15px;font-weight:700;color:{COLOR_GREEN};'
-        f'text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px 2px;">'
+        f'<p style="font-size:15px;font-weight:700;color:{COLOR_TEAL};'
+        f'letter-spacing:.02em;margin:0 0 4px 2px;">'
         f'Country selection</p>',
         unsafe_allow_html=True,
     )
@@ -1208,25 +1345,6 @@ def render_home():
             # render, so it must be set directly for the box to actually show these.
             st.session_state["country_group_widget"] = _partner_names
             st.rerun()
-
-    if sel:
-        st.markdown(
-            f'<div style="background:{_type_colour};border-radius:8px;'
-            f'padding:16px 20px;margin-bottom:16px;">'
-            f'<div style="font-size:18px;font-weight:700;color:white;line-height:1.3;">'
-            f'{_type_label}, {_cx_label}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f'<div style="background:#e0e4ea;border-radius:8px;'
-            f'padding:16px 20px;margin-bottom:16px;">'
-            f'<div style="font-size:18px;font-weight:700;color:#999;line-height:1.3;">'
-            f'Select a country to see its trade integration profile</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
 
     # Pre-compute summary values needed inside col_grp
     _sum_agrs   = AGREEMENTS_MAP.get(sel, [])
@@ -1281,25 +1399,49 @@ def render_home():
                 _agr_sent  = f"{sel_name} has {_n_agrs} FTA{_agr_s} on record{_depth_qual}."
                 _cent_sent = _cent_qual
                 _peci_sent = _peci_qual
+                _type_sent = f"This makes {sel_name} a {_type_label.lower()}, with {_cx_label}."
+
+                def _red(name):
+                    return (
+                        f'<span style="color:{COLOR_RED};font-weight:700;">'
+                        f'{_html.escape(name)}</span>'
+                    )
+
+                _reco_sent_parts = []
+                if _top_depth_name:
+                    _reco_sent_parts.append(
+                        f"If {_html.escape(sel_name)} wanted to make deeper additional agreements, "
+                        f"it should consider {_red(_top_depth_name)}."
+                    )
+                if _top_cent_name:
+                    _reco_sent_parts.append(
+                        f"For network centrality, {_red(_top_cent_name)} would be the strongest option."
+                    )
+                if _top_eci_name:
+                    _reco_sent_parts.append(
+                        f"For economic complexity, {_red(_top_eci_name)} would be the strongest option."
+                    )
+                # Built from already-escaped pieces plus literal <span> tags — do
+                # NOT run this back through _html.escape() below, that would
+                # neuter the span tags into visible text instead of red styling.
+                _reco_sent = " ".join(_reco_sent_parts)
 
                 st.markdown(
-                    f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
+                    f'<div style="font-size:15px;font-weight:700;color:{COLOR_CYAN};'
                     f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">'
                     f'Analysis of current trade agreements position</div>'
-                    f'<div style="font-size:17px;color:#333;line-height:1.8;">'
+                    f'<div style="font-size:17px;color:#EAF1F7;line-height:1.8;">'
                     f'{_html.escape(_agr_sent)} '
                     f'{_html.escape(_cent_sent)} '
-                    f'{_html.escape(_peci_sent)}'
+                    f'{_html.escape(_peci_sent)} '
+                    f'{_html.escape(_type_sent)} '
+                    f'{_reco_sent}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-                # Filled in below, once the score-card figures further down the
-                # page have been computed — keeps both sections showing the
-                # exact same numbers rather than two independently-derived sets.
-                _analysis_numbers_slot = st.empty()
             else:
                 st.markdown(
-                    f'<div style="color:#999;font-size:12px;">'
+                    f'<div style="color:#7C8FA0;font-size:12px;">'
                     f'Select a country to see its analysis.</div>',
                     unsafe_allow_html=True,
                 )
@@ -1307,8 +1449,8 @@ def render_home():
     with col_grp:
         with st.container(border=True, height=420):
             st.markdown(
-                f'<div style="font-size:15px;font-weight:700;color:{COLOR_BLUE};'
-                f'text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px 2px;">'
+                f'<div style="font-size:15px;font-weight:700;color:{COLOR_CYAN};'
+                f'letter-spacing:.02em;margin:0 0 4px 2px;">'
                 f'Current trade agreement partners, add more</div>',
                 unsafe_allow_html=True,
             )
@@ -1359,12 +1501,15 @@ def render_home():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Globe (full width) ────────────────────────────────────────────────────
+    # height must match _build_globe_html's container_h (720 for non-intro
+    # mode) — a shorter iframe clips the bottom of #graph-container, hiding
+    # its bottom border.
     components.html(
         _build_globe_html(sel=sel, sel_partners=sel_partners, intro_mode=False,
                           all_eci=_eci_index, all_centrality=_centrality_index,
                           pair_agreements=PAIR_AGREEMENTS,
                           group_isos=_grp_new),
-        height=640,
+        height=720,
     )
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1393,8 +1538,6 @@ def render_home():
     # ── When a group is selected, override displayed card values ──────────
     _grp_mode = bool(_grp_iso3s)
     if _grp_mode:
-        _disp_agr_val  = f"{len(_grp_new)} new"
-        _disp_agr_note = f"{len(_grp_already)} already partners · {len(_grp_iso3s)} in group"
         if _sim_cent is not None:
             _delta = round(_sim_cent - (cent_pct2 or 0), 1)
             _delta_str = f"+{_delta}" if _delta >= 0 else str(_delta)
@@ -1444,31 +1587,25 @@ def render_home():
             _pc2 = COLOR_RED
             _disp_exp_note = "additionality unavailable"
     else:
-        _disp_agr_val  = str(len(agreements))
-        _disp_agr_note = "hover to view list · WB DTA 2.0 records"
         _disp_cent_val = f"{cent_pct2} / 100" if cent_pct2 is not None else "N/A"
         _cc2 = cc
-        _disp_cent_note = "hover for detail · % of max eigenvector centrality"
+        _disp_cent_note = (
+            "hover for detail · % of max eigenvector centrality" if sel
+            else "select a country above"
+        )
         _disp_depth_val = f"{depth_pct2} / 100" if depth_pct2 is not None else "N/A"
-        _disp_depth_note = "hover for detail · " + ("WB DTA 2.0" if has_dta_coverage else "no WB DTA 2.0 match")
+        _disp_depth_note = (
+            "hover for detail · " + ("WB DTA 2.0" if has_dta_coverage else "no WB DTA 2.0 match") if sel
+            else "select a country above"
+        )
         _disp_exp_val  = f"{_avg_peci:.2f}" if _avg_peci is not None else "N/A"
         _pc2 = pc
-        _disp_exp_note = "hover for detail · complexity additionality from more complex partners"
+        _disp_exp_note = (
+            "hover for detail · complexity additionality from more complex partners" if sel
+            else "select a country above"
+        )
 
     # ── Hover panel data ───────────────────────────────────────────────────
-
-    # Card 1 — agreements list rows
-    agr_rows_html = (
-        "".join(
-            f'<div style="display:flex;justify-content:space-between;padding:7px 12px;'
-            f'border-bottom:1px solid #f0f2f5;font-size:12.5px;">'
-            f'<span style="color:#222;">{a["name"]}</span>'
-            f'<span style="color:{COLOR_BLUE};font-weight:600;white-space:nowrap;'
-            f'margin-left:12px;">{a["year"] if a["year"] else "—"}</span></div>'
-            for a in agreements
-        ) if agreements
-        else '<div style="padding:14px 12px;color:#aaa;font-size:12.5px;">No WB DTA 2.0 records found.</div>'
-    )
 
     # Card 2 — centrality: FTA partners ranked by their own centrality
     _cent_partners = []
@@ -1527,50 +1664,45 @@ def render_home():
     def _ph(title):
         return (
             f'<div style="padding:10px 12px 8px;font-size:11px;font-weight:700;'
-            f'color:{COLOR_BLUE};text-transform:uppercase;letter-spacing:.05em;'
-            f'border-bottom:1px solid #f0f2f5;position:sticky;top:0;background:white;">'
+            f'color:{COLOR_CYAN};text-transform:uppercase;letter-spacing:.05em;'
+            f'border-bottom:1px solid rgba(255,255,255,0.10);position:sticky;top:0;background:#0e161f;">'
             f'{title}</div>'
         )
 
     def _ps(label):
         return (
             f'<div style="padding:5px 12px 3px;font-size:10px;font-weight:700;'
-            f'color:#aaa;text-transform:uppercase;letter-spacing:.05em;background:#fafafa;">'
+            f'color:#7C8FA0;text-transform:uppercase;letter-spacing:.05em;background:#121b26;">'
             f'{label}</div>'
         )
 
     def _pr(left, right, col=None):
-        _c = col or COLOR_BLUE
+        _c = col or COLOR_CYAN
         return (
             f'<div style="display:flex;justify-content:space-between;align-items:center;'
-            f'padding:6px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;">'
-            f'<span style="color:#333;flex:1;margin-right:8px;">{left}</span>'
+            f'padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.07);font-size:12px;">'
+            f'<span style="color:#D7E2EA;flex:1;margin-right:8px;">{left}</span>'
             f'<span style="font-weight:700;color:{_c};white-space:nowrap;">{right}</span>'
             f'</div>'
         )
 
     def _pnote(text):
         return (
-            f'<div style="padding:8px 12px;font-size:10.5px;color:#999;'
-            f'font-style:italic;border-top:1px solid #f0f2f5;">{text}</div>'
+            f'<div style="padding:8px 12px;font-size:10.5px;color:#7C8FA0;'
+            f'font-style:italic;border-top:1px solid rgba(255,255,255,0.10);">{text}</div>'
         )
 
     def _ccol(v):
         return COLOR_GREEN if v >= 60 else (COLOR_ORANGE if v >= 25 else COLOR_RED)
 
     _PS = (
-        f'position:absolute;top:calc(100% + 6px);left:0;background:white;'
-        f'border:1px solid #e0e4ea;border-radius:6px;'
-        f'box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;'
+        f'position:absolute;top:calc(100% + 6px);left:0;background:#0e161f;'
+        f'border:1px solid {COLOR_TEAL};border-radius:6px;'
+        f'box-shadow:0 8px 28px rgba(0,0,0,.55);z-index:999;'
         f'max-height:380px;overflow-y:auto;display:none;'
     )
 
     # ── Build panel bodies ─────────────────────────────────────────────────
-
-    agr_panel = (
-        _ph(f"{sel_name or 'Country'} — {len(agreements)} agreements")
-        + agr_rows_html
-    )
 
     cent_panel = (
         _ph(f"Connections by centrality · {len(_cent_partners)} partners with data")
@@ -1611,16 +1743,16 @@ def render_home():
         _ph(f"Economic complexity — {sel_name or 'Country'}")
         + (
             _pr("ECI score", f"{own_eci:+.2f}", ec)
-            + _pr("Global rank", f"{own_rank} of {total_eci}", COLOR_BLUE)
-            + f'<div style="padding:10px 12px;font-size:12px;color:#444;'
-              f'line-height:1.6;border-bottom:1px solid #f5f5f5;">{_eci_interp}</div>'
+            + _pr("Global rank", f"{own_rank} of {total_eci}", COLOR_CYAN)
+            + f'<div style="padding:10px 12px;font-size:12px;color:#D7E2EA;'
+              f'line-height:1.6;border-bottom:1px solid rgba(255,255,255,0.07);">{_eci_interp}</div>'
             + (_ps("Nearest comparators") + "".join(
                 _pr(n, f"#{r} · {s:+.2f}",
                     COLOR_GREEN if r < own_rank else COLOR_ORANGE)
                 for n, r, s in _eci_nbrs
             ) if _eci_nbrs else "")
             if own_eci is not None
-            else _pr("No ECI data available", "—", "#aaa")
+            else _pr("No ECI data available", "—", "#7C8FA0")
         )
         + _pnote("Source: Harvard Atlas of Economic Complexity (2012).")
     )
@@ -1631,7 +1763,7 @@ def render_home():
             _pr(n, f"{s:+.2f}",
                 COLOR_GREEN if s > 0.5 else (COLOR_ORANGE if s > -0.2 else COLOR_RED))
             for n, s, _ in _peci_top
-        ) if _peci_top else _pr("No partner ECI data", "—", "#aaa"))
+        ) if _peci_top else _pr("No partner ECI data", "—", "#7C8FA0"))
         + (_ps("Lowest complexity partners") + "".join(
             _pr(n, f"{s:+.2f}",
                 COLOR_GREEN if s > 0.5 else (COLOR_ORANGE if s > -0.2 else COLOR_RED))
@@ -1645,13 +1777,14 @@ def render_home():
     def _card_full(wc, pc_cls, label, value_str, note, colour, panel_body, pw=340):
         return (
             f'<div style="flex:1;position:relative;" class="{wc}">'
-            f'<div style="border-left:4px solid {colour};background:#f8f9fa;'
+            f'<div style="border-left:4px solid {colour};background:var(--panel-bg);'
+            f'backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);'
             f'border-radius:0 6px 6px 0;padding:14px 16px;cursor:default;">'
-            f'<div style="font-size:10px;color:#888;text-transform:uppercase;'
-            f'letter-spacing:.05em;margin-bottom:4px;">{label}</div>'
+            f'<div style="font-size:17px;color:{COLOR_TEAL};'
+            f'letter-spacing:.02em;margin-bottom:4px;">{label}</div>'
             f'<div style="font-size:32px;font-weight:700;color:{colour};line-height:1.15;">'
             f'{value_str}</div>'
-            f'<div style="font-size:10.5px;color:#555;margin-top:4px;">{note}</div>'
+            f'<div style="font-size:17px;color:#EAF1F7;margin-top:4px;">{note}</div>'
             f'</div>'
             f'<div class="{pc_cls}" style="{_PS}width:{pw}px;">{panel_body}</div>'
             f'</div>'
@@ -1659,28 +1792,13 @@ def render_home():
 
     _hover_css = "".join(
         f'.{w}:hover .{p}{{display:block!important;}}'
-        for w, p in [("aw","ap"),("cw","cp"),("dw","dp"),("ew","ep"),("xw","xp")]
+        for w, p in [("cw","cp"),("dw","dp"),("xw","xp")]
     )
 
-    _agr_label  = "Potential new partners" if _grp_mode else "Trade agreements"
     _cent_label = "Group centrality" if _grp_mode else "Network centrality"
     _exp_label  = "Simulated additionality" if (_grp_mode and _sim_exp_peci is not None) else "Complexity additionality"
 
-    if sel:
-        _analysis_numbers_slot.markdown(
-            f'<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;'
-            f'font-size:13px;color:#555;">'
-            f'<b>{_agr_label}:</b> {_disp_agr_val} &nbsp;·&nbsp; '
-            f'<b>{_cent_label}:</b> {_disp_cent_val} &nbsp;·&nbsp; '
-            f'<b>Agreement depth:</b> {_disp_depth_val} &nbsp;·&nbsp; '
-            f'<b>{_exp_label}:</b> {_disp_exp_val}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
     cards_html = "".join([
-        _card_full("aw", "ap", _agr_label, _disp_agr_val,
-                   _disp_agr_note, COLOR_BLUE, agr_panel, pw=380),
         _card_full("cw", "cp", _cent_label, _disp_cent_val,
                    _disp_cent_note, _cc2, cent_panel),
         _card_full("dw", "dp", "Agreement depth", _disp_depth_val,
@@ -1696,86 +1814,64 @@ def render_home():
     )
 
     # ── Partner recommendations ────────────────────────────────────────────
+    # _depth_cands / _cent_cands / _eci_cands were computed earlier (alongside
+    # the typology calc) so the analysis paragraph could also name each metric's
+    # top pick — this section just renders them.
     st.markdown("<br>", unsafe_allow_html=True)
 
     if sel:
-        _non_partners = [
-            iso for iso in _all_iso3s
-            if iso != sel and iso not in sel_partners
-        ]
-
-        # Depth proxy: number of FTA agreements each non-partner has signed
-        _all_cent_r = [v for v in _centrality_index.values() if v > 0]
-        _cmax_r     = max(_all_cent_r) if _all_cent_r else 1.0
-
-        _depth_cands, _cent_cands, _eci_cands = [], [], []
-        for _iso in _non_partners:
-            _name = COUNTRY_LOOKUP.get(_iso, {}).get("name", _iso)
-            _n_agr = len(AGREEMENTS_MAP.get(_iso, []))
-            if _n_agr:
-                _depth_cands.append((_name, _n_agr))
-            _c = _centrality_index.get(_iso)
-            if _c is not None:
-                _cent_cands.append((_name, round(_c / _cmax_r * 100, 1)))
-            _e = _eci_index.get(_iso)
-            if _e is not None:
-                _eci_cands.append((_name, _e))
-
-        _depth_cands.sort(key=lambda x: x[1], reverse=True)
-        _cent_cands.sort(key=lambda x: x[1],  reverse=True)
-        _eci_cands.sort(key=lambda x: x[1],   reverse=True)
-
         def _rec_row(name, val_str, colour):
             return (
                 f'<div style="display:flex;justify-content:space-between;align-items:center;'
-                f'padding:7px 12px;border-bottom:1px solid #f0f2f5;font-size:12.5px;">'
-                f'<span style="color:#222;">{_html.escape(name)}</span>'
+                f'padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.07);">'
+                f'<span style="color:#EAF1F7;font-size:17px;">{_html.escape(name)}</span>'
                 f'<span style="font-weight:700;color:{colour};white-space:nowrap;'
-                f'margin-left:8px;">{val_str}</span></div>'
+                f'font-size:12.5px;margin-left:8px;">{val_str}</span></div>'
             )
 
         def _rec_panel(title, subtitle, rows_html):
             return (
-                f'<div style="flex:1;border:1px solid #e0e4ea;border-radius:8px;overflow:hidden;">'
-                f'<div style="padding:10px 12px;background:#f8f9fa;border-bottom:1px solid #e0e4ea;">'
-                f'<div style="font-size:11px;font-weight:700;color:{COLOR_BLUE};'
-                f'text-transform:uppercase;letter-spacing:.05em;">{title}</div>'
-                f'<div style="font-size:10.5px;color:#888;margin-top:2px;">{subtitle}</div>'
+                f'<div style="flex:1;border:1px solid var(--panel-border);border-radius:8px;'
+                f'overflow:hidden;background:var(--panel-bg);backdrop-filter:blur(14px);'
+                f'-webkit-backdrop-filter:blur(14px);">'
+                f'<div style="padding:10px 12px;background:rgba(255,255,255,0.04);'
+                f'border-bottom:1px solid var(--panel-border);">'
+                f'<div style="font-size:17px;font-weight:700;color:{COLOR_CYAN};'
+                f'letter-spacing:.02em;">{title}</div>'
+                f'<div style="font-size:17px;color:#EAF1F7;margin-top:2px;">{subtitle}</div>'
                 f'</div>{rows_html}</div>'
             )
 
         _depth_rows = "".join(
-            _rec_row(n, f"{v} agreements",
-                     COLOR_GREEN if v >= 30 else (COLOR_ORANGE if v >= 10 else COLOR_RED))
+            _rec_row(n, f"{v} agreements", COLOR_TEAL)
             for n, v in _depth_cands[:7]
-        ) or '<div style="padding:12px;color:#aaa;font-size:12px;">No data.</div>'
+        ) or '<div style="padding:12px;color:#EAF1F7;font-size:17px;">No data.</div>'
 
         _cent_rows = "".join(
-            _rec_row(n, f"{v} / 100",
-                     COLOR_GREEN if v >= 60 else (COLOR_ORANGE if v >= 25 else COLOR_RED))
+            _rec_row(n, f"{v} / 100", COLOR_TEAL)
             for n, v in _cent_cands[:7]
-        ) or '<div style="padding:12px;color:#aaa;font-size:12px;">No data.</div>'
+        ) or '<div style="padding:12px;color:#EAF1F7;font-size:17px;">No data.</div>'
 
         _eci_rows = "".join(
-            _rec_row(n, f"{v:+.2f}",
-                     COLOR_GREEN if v > 0.5 else (COLOR_ORANGE if v > -0.2 else COLOR_RED))
+            _rec_row(n, f"{v:+.2f}", COLOR_TEAL)
             for n, v in _eci_cands[:7]
-        ) or '<div style="padding:12px;color:#aaa;font-size:12px;">No data.</div>'
+        ) or '<div style="padding:12px;color:#EAF1F7;font-size:17px;">No data.</div>'
 
         st.markdown(
-            f'<div style="margin-bottom:8px;font-size:10px;font-weight:700;color:{COLOR_GREEN};'
-            f'text-transform:uppercase;letter-spacing:.08em;">Recommended trade partners</div>'
+            f'<div style="margin-bottom:8px;font-size:17px;font-weight:700;color:{COLOR_TEAL};'
+            f'letter-spacing:.02em;">Recommended trade partners</div>'
             f'<div style="display:flex;gap:12px;">'
-            f'{_rec_panel("Agreement depth", "Non-partners ranked by FTA track record (agreement count proxy)", _depth_rows)}'
-            f'{_rec_panel("Network centrality", "Non-partners whose centrality would most lift your own", _cent_rows)}'
-            f'{_rec_panel("Economic complexity", "Non-partners with highest ECI — Harvard Atlas 2012", _eci_rows)}'
+            f'{_rec_panel(f"{sel_name} could increase the depth of its agreements with the following countries", "Non-partners ranked by FTA track record (agreement count proxy)", _depth_rows)}'
+            f'{_rec_panel(f"{sel_name} could increase its network centrality with the following countries", "Non-partners whose centrality would most lift your own", _cent_rows)}'
+            f'{_rec_panel(f"{sel_name} could increase its economic complexity exposure with the following countries", "Non-partners with highest ECI — Harvard Atlas 2012", _eci_rows)}'
             f'</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            f'<div style="padding:16px 20px;background:#f8f9fa;border-radius:8px;'
-            f'border:1px solid #e0e4ea;font-size:13px;color:#999;">'
+            f'<div style="padding:16px 20px;background:var(--panel-bg);border-radius:8px;'
+            f'backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);'
+            f'border:1px solid var(--panel-border);font-size:17px;color:#EAF1F7;">'
             f'Select a country above to see recommended trade partners.</div>',
             unsafe_allow_html=True,
         )

@@ -151,6 +151,19 @@ conda activate trade-app && python centrality_pipeline.py --show
 - **Agreement/provision values — RESOLVED (2026-07-14)**: `EXPLICIT_DATA`/`gen_dta`/`TIER_RANGES` (the 21-country hardcoded dict + random-per-tier generator) removed from `network_example.py`. `centrality_pipeline.py` now also computes `avg_enforceable`/`max_enforceable` per country — for each country, the mean/max of the binary-provision depth score (see the depth-weighting fix above) across all of *its own* agreements, from the same DTA 2.0 `Bilateral Information` sheet (deduplicated across the panel's years). `n_agreements`/`n_partners` were already real (DESTA-derived) in `centrality_scores.csv` but previously unused — the app read illustrative values instead. All four now come from the same `centrality_scores.csv` used by AG/AV/MX/PT in the sidebar. `DEPTH_MAX` (used to scale `avg_enforceable` to a 0–100 "agreement depth" score) is now computed dynamically as the real data's max, replacing a hardcoded `47` calibrated to the old illustrative scale (three separate call sites). 4 of 203 countries (Palau, Timor-Leste, Western Sahara, Monaco) have real DESTA agreements but no matching WB DTA 2.0 agreement, so read 0 for `avg_enforceable`/`max_enforceable` — a genuine "no data" case, surfaced in the UI as "no WB DTA 2.0 match" rather than silently shown as illustrative. (Superseded by the "Base network source mismatch" entry above: `n_agreements`/`n_partners` are no longer DESTA-derived at all — DESTA has since been removed from the pipeline entirely — and the "4 countries" framing no longer applies since there's no separate DESTA-agreement concept left to mismatch against.)
 - **Institutional quality pillar removed entirely (2026-07-14)**: the app's third analytical pillar (alongside centrality and complexity) was institutional quality, via `compute_scores()` in `score.py` — a commitment/implementation/gap-score/quadrant composite index built on WGI governance indicators plus several manually-downloaded data sources. Investigating **why** revealed two separate things bundled under one name: (1) `compute_scores()`'s composite quadrant system was genuinely orphaned — `network_example.py` never read `scores.csv` or referenced `commitment_score`/`implementation_score`/`gap_score`/`quadrant` anywhere; and (2) `render_institutional()`, a *different*, simpler page showing raw WGI indicators (rule of law, regulatory quality, government effectiveness, control of corruption) as stat cards and a bar chart, reading `wb_cache.csv` directly — this one was real, working code, but **also never called** (only `render_home()` is invoked at the bottom of the script; there was no navigation path to reach it). Git history confirms this feature belonged to an older `app.py`, removed in favour of `network_example.py`, and never carried over. User decided to remove institutional quality entirely rather than reconnect it. Removed: `pipeline.py` and `score.py` (whole files — `fetch_world_bank()` had no other consumer once `render_institutional()` was gone), `render_institutional()` and its `_wb_df`/`_wb_path` loading block from `network_example.py`, and the data files `data/raw/wb_cache.csv` / `data/processed/scores.csv`. Section 1/2's description of the app updated to two pillars (centrality, complexity) instead of three; Scripts and Data files tables in Section 5 updated accordingly. **Verified**: `network_example.py` and `centrality_pipeline.py` both still parse and run cleanly after removal; confirmed zero remaining references to `pipeline.py`/`score.py`/`wb_cache.csv`/`scores.csv`/institutional quality/governance anywhere in the codebase (checked for false positives from `centrality_pipeline.py`/`centrality_scores.csv`/`eci_scores.csv` substring matches).
 - **Adopt AI-disclosure convention**: adopt the guidance at [ggfevans/ai-disclosure](https://github.com/ggfevans/ai-disclosure) — add an `AI_DISCLOSURE.md` at the repo root (YAML frontmatter: `disclosure-default`, `models-used`, `providers`, `scope`, `last-updated`) and start adding `SPDX-AI-Disclosure:` file-level headers to new or substantially-modified files going forward. Do not retroactively annotate the whole existing repo at once — the convention explicitly recommends against that.
+- **Rewrite Section 4 ("Data sources") in Lawrence's own language.** The section currently reads as an auto-generated reference table; put it into Lawrence's own words.
+- **Prune Section 4 to sources actually wired into the app.** Only the first sub-section (WB DTA 2.0 + Harvard Atlas) is consumed by `centrality_pipeline.py`/`network_example.py` today — Dispute Settlement (DSB/ISDS), Non-Tariff Measures (STCs/NTM Coverage/TRAINS/AVE), Trade Flows (GTA/BACI/WITS), and Standards (DMAS/SEP/PUR) are not read by any script. Remove these, or keep them only if explicitly flagged as a future-sourcing shortlist rather than implying they're live.
+- **Rewrite the Scripts subsection of Section 5 in Lawrence's own language.** Currently an auto-generated table describing `network_example.py` and `centrality_pipeline.py`.
+- **Reframe "Known limitations and next steps" as a "Design decisions" section.** Nearly every entry under this heading is now marked RESOLVED and documents a decision made (e.g. which WB DTA 2.0 rows count as an edge, which distance column to use) rather than an outstanding limitation — the heading no longer matches most of the content. Move resolved decision-trail entries under a "Design decisions" heading; keep only genuinely open items (AI-disclosure, orphaned `wbdata` dependency, and this list) under "next steps."
+- **Update the GitHub repository's description field** for `trade-implementation-effects-app` to match the app's current two-pillar (centrality + complexity) scope, since the institutional-quality pillar was removed.
+- **Run the app/codebase through an evaluation agent** (e.g. `/code-review`) — not yet done since the DESTA→WB DTA 2.0 migration and the other Section 5 fixes above.
+- **Write/update `README.md`** to reflect the current app state (WB DTA 2.0 as sole network source, two-pillar scope, institutional-quality pillar removed) — last updated before these changes.
+- **Rewrite the pseudocode/docstrings in `centrality_pipeline.py` in Lawrence's own words, and link this to the AI-disclosure convention above.** The module's step-by-step comments and docstrings currently read in a generic, AI-generated style; rewriting them in Lawrence's own language is itself the kind of substantive modification the "Adopt AI-disclosure convention" item above says should carry an `SPDX-AI-Disclosure:` header going forward — do the two together rather than as separate passes.
+- **Do the same for `network_example.py`, but expand it.** Rewrite its pseudocode/docstrings in Lawrence's own words (again tying the change to the AI-disclosure header, as above), and — since it's the larger, user-facing Streamlit app rather than a single-purpose pipeline script — take the opportunity to expand the explanatory comments/docstrings rather than a like-for-like rewrite.
+- **Recolour the app — RESOLVED (2026-07-15)**: the app now uses the image at `assets/visax-FpkeKQlgJtI-unsplash.jpg` (a dark, teal/cyan particle-wave visualization) as a fixed backdrop behind the whole page, with the rest of the styling redesigned around it — light UI chrome (white cards, white sidebar, white dropdown menus) replaced with a dark "glass" panel system (translucent, blurred backgrounds; light text) so the backdrop reads through. `COLOR_BLUE` (`#004B87`) is kept only for opaque solid-fill elements (badges, active pills) where it was already working; a new `COLOR_CYAN` (`#4DD8E8`), pulled from the image's own wave colour, replaces it everywhere it was previously used as *text* on a card, since the original dark navy had too little contrast against a dark panel. `COLOR_RED` brightened from `#C0392B` to `#E8564B` for the same reason. The seven WB-region colours (map/network legend) were also brightened for visibility against the dark 3D graph and legend panel. Added `.streamlit/config.toml` (`[theme] base="dark"`, matching palette) so native Streamlit widget chrome not covered by the app's own CSS follows suit, and a cached `_load_backdrop_b64()` helper that downsizes the (large, 8750×12667px) source image to a sane width before base64-embedding it, so the page payload stays reasonable. `Pillow` added to `requirements.txt` for this. Verified by running the app and checking the home page, country analysis view, score-card hover panels, dropdown menus, and the 3D network graph.
+- **Address confusion around the country category box, probably by moving the categories into the analysis section.** Users are unclear what the country-category display is showing; likely fix is relocating it so it sits alongside the rest of a selected country's analysis rather than as a separate, unexplained element.
+- **Make it easier to see additional country selections and how they affect scores.** The group-simulation feature (comparing a selected country against additional chosen partners) needs a clearer UI so the user can readily see which countries are added and how each affects the resulting scores.
+- **Evaluate the app, and evaluate evaluation tools themselves, perhaps using Langsmith, Arize, Maze, or Posthog.** Covers both dimensions raised in discussion: LLM/agent-eval platforms (Langsmith, Arize) for grading the Trade Economist agent's output faithfulness once built (item 14), and usability-testing platforms (Maze, Posthog) for the app's UI. Needs a decision on which tool(s) are worth the setup cost for an app this size, not just which are best in the abstract.
 
 ## 6. Rules
 
@@ -179,71 +192,7 @@ _To be defined._
 
 ## 8. Agents
 
-### Trade Economist
-
-**Purpose.** A conversational agent embedded in the app that allows the user to interrogate a selected country's trade position across the three analytical dimensions the app measures: FTA network centrality, agreement depth and breadth, and economic complexity. The agent grounds its responses in the academic literature held in the knowledge base (Section 10), surfacing relevant findings and citing sources rather than generating unsupported claims.
-
-**Trigger.** The agent is invoked from the analysis page once a country has been selected. A text input or chat widget in the sidebar or below the score cards lets the user ask free-form questions such as "Why does centrality matter for this country?" or "What does the literature say about the link between FTA depth and ECI for middle-income economies?"
-
-**Inputs passed to the agent at invocation.**
-
-| Variable | Source | Description |
-|----------|--------|-------------|
-| `sel_name` | App state | Name of the selected country |
-| `cent_pct2` | `centrality_scores.csv` | Eigenvector centrality as % of global max |
-| `depth_pct2` | `COUNTRY_DATA` / DTA 2.0 | Agreement depth score (0–100) |
-| `own_eci` | `eci_scores.csv` | Harvard Atlas ECI score |
-| `_avg_peci` | Computed | Average ECI of FTA partners |
-| `len(agreements)` | `agreements.csv` (WB DTA 2.0) | Number of FTA records |
-| `_type_label` | Computed | Integration profile typology label |
-| `_cx_label` | Computed | Complexity exposure label |
-
-These are injected into the system prompt so the agent has the country's quantitative profile without the user having to restate it.
-
-**Retrieval.** Before generating a response the agent queries the knowledge base (Section 10) using the user's question as the retrieval query. The top-k chunks (default k=5) are appended to the prompt as grounding context. The agent must cite the source document for any claim it draws from retrieved chunks.
-
-**Model.** `claude-opus-4-7`. Extended thinking disabled by default; enable if the user asks a multi-step analytical question (e.g. "Walk me through the mechanism by which centrality raises ECI").
-
-**System prompt skeleton.**
-
-```
-You are a trade economist advising on {sel_name}'s trade strategy.
-
-Country profile:
-- FTA network centrality: {cent_pct2} / 100
-- Agreement depth (proxy): {depth_pct2} / 100
-- Number of FTA records: {n_agreements}
-- Economic complexity (ECI): {own_eci} (Harvard Atlas 2012)
-- Average partner ECI: {avg_peci}
-- Integration profile: {type_label}, {cx_label}
-
-You have access to the following excerpts from the academic literature:
-{retrieved_chunks}
-
-Answer the user's question using the data above and the literature excerpts.
-Cite sources by author and year. Flag data limitations honestly.
-Do not fabricate statistics or citations not present in the excerpts.
-Label your response as AI-generated analysis.
-```
-
-**What the agent can do.**
-- Explain what the country's centrality, depth, and ECI scores mean in economic terms.
-- Summarise what the literature says about mechanisms linking FTA network position to complexity outcomes.
-- Discuss which partner countries the literature identifies as high-value for knowledge transfer and complexity gains.
-- Compare the selected country's profile to findings reported in the literature (e.g. thresholds, typical ranges).
-- Flag data limitations (2012 ECI vintage, binary centrality weights, illustrative depth data).
-
-**What the agent cannot do.**
-- Access real-time data or sources outside the knowledge base.
-- Run regressions or produce new quantitative estimates.
-- Speak to country-specific political or diplomatic considerations not covered in the literature corpus.
-
-**Implementation notes.**
-- Import `chromadb` and load the persistent collection from `knowledge_base/vectordb/`.
-- Use `sentence-transformers` (model: `all-MiniLM-L6-v2`) to embed the user query for retrieval, consistent with how documents were ingested.
-- Stream the response to the UI using `anthropic.Anthropic().messages.stream(...)` so the user sees output incrementally.
-- Persist the conversation history in `st.session_state["economist_messages"]` as a list of `{"role": ..., "content": ...}` dicts so the user can ask follow-up questions within a session.
-- Clear conversation history when the selected country changes.
+_None implemented. A Trade Economist advisory agent was previously specified here in detail; that spec described functionality that was never built. See Section 13 ("Possible extensions") for a summary of what such an agent could do._
 
 ## 9. Orchestrator
 
@@ -422,27 +371,10 @@ Academic papers relevant to the analytical framework of this app. All concern th
 
 Larger, more speculative pieces of work that go beyond fixing a known limitation — new data pipelines or capabilities rather than bug fixes.
 
-### Derive ECI ourselves instead of using Harvard's precomputed value
+### Trade Economist advisory agent
 
-**Current state.** `data/processed/eci_scores.csv` is Harvard Growth Lab's own precomputed ECI output (`new_observatory_cy.csv`), for 2012 only — the most recent year in the free public CID GitHub archive. We consume it as a finished number; we never touch the underlying country × product export matrix.
+**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in the knowledge base (Section 10) and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today.
 
-**Why 2012-only is limiting.** It's a single frozen cross-section, 14+ years stale, vs. Fan et al.'s 2000–2019 panel. Their panel lets them show that centrality *precedes and predicts* rising ECI over time — a real causal/mechanism argument. Our single year can only show static correlation for 2012, with no ability to test whether centrality causes complexity to rise later.
+**What it could do.** Explain what a country's centrality, depth, and ECI scores mean in economic terms; summarise what the literature says about mechanisms linking FTA network position to complexity outcomes; identify which partner countries the literature flags as high-value for knowledge transfer and complexity gains; compare a country's profile to literature-reported thresholds and typical ranges; and flag the app's known data limitations (2012 ECI vintage, binary centrality weights) when relevant.
 
-**Why "precomputed" (not derived) limits the app's group-simulation feature.** ECI is defined recursively via the "method of reflections" (Hausmann & Hidalgo, 2011): a country's complexity depends on the complexity of the products it exports; a product's complexity depends on the diversification and sophistication of the countries that export it. This circular definition is solved by iterating — conceptually the same family of technique as the eigenvector centrality already computed in `centrality_pipeline.py`, just applied to a country-product bipartite network instead of a country-country FTA network.
-
-Because we only hold Harvard's *finished* 2012 number rather than the raw export matrix, `compute_additionality()` in `network_example.py` can only average the existing, static ECI values of whichever partners a user picks in the "assess a group" simulation (`group_mean - own_eci`) — arithmetic on fixed numbers, not a re-estimation. A country's own ECI never moves in response to a simulated new partnership. If we instead held raw product-level export data (e.g. UN Comtrade or BACI — see the "Replicate Fan et al.'s regression" item below) and implemented the method of reflections ourselves, a hypothetical new partner could be pushed through the recursive calculation to show how a country's *own* complexity might actually shift from that exposure — a genuine mechanism simulation rather than a static lookup.
-
-**Scope.** This is a materially bigger lift than the fixes in Section 5 — a new data-sourcing and computation pipeline (raw trade-flow data → country-product bipartite matrix → iterative method of reflections), not a bug fix to existing code.
-
-### Replicate Fan et al.'s regression (ECI ~ Centrality + controls)
-
-**Current state.** The app displays centrality, depth, and ECI as descriptive scores, but never formally tests Fan et al.'s core claim — that FTA-network centrality predicts economic complexity — against our own data. This was originally tracked as two separate Section 5 items ("Regression not implemented" and "Missing control-variable data stack"); both are moved here because the app's stated goal is to make the paper's findings usable and explorable, not to academically replicate its regression — see [[project_trade_app_not_a_replication]]. This is optional, additive work, not something the app is missing to fulfil its purpose.
-
-**What replication would involve.** Fan et al.'s specification is a country-year panel: `ECI_it = β0 + β1·Centrality_it + β2·Controls_it + country FE + year FE + ε_it`, with controls for population, human capital, natural-resource rents, financial development, and trade openness (all WDI), estimated 2000–2019. Reproducing it would need:
-- A centrality **panel**, not a single snapshot — `centrality_pipeline.py --year` already supports building centrality for a specific year (WB DTA 2.0's own goods entry-into-force dates), so this part is mostly already possible.
-- A matching ECI **panel** — blocked by the same 2012-only-snapshot issue as the "Derive ECI ourselves" extension above; the two extensions would likely be built together.
-- The WDI control variables themselves (population, human capital, natural-resource rents, financial development, openness) — none are in the repo.
-- Possibly CEPII gravity data (distance/language/colony/border) and IIA Navigator bilateral investment treaty counts, if replicating robustness checks rather than just the headline result.
-- Attention to reverse causality — more complex economies may attract more FTA partners rather than only benefiting from them; Fan et al. likely address this with lagged centrality or an instrument, and a naive OLS replication without that would overstate the finding.
-
-**Scope.** A genuinely new data pipeline (panel construction + WDI/CEPII sourcing + panel regression), not a small addition — and only worth doing if the goal shifts from "usable app" to "academic replication."
+**What it couldn't do.** Access real-time data outside the knowledge base; run new regressions or produce quantitative estimates; speak to country-specific political or diplomatic considerations not covered in the literature corpus.
