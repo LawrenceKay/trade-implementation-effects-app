@@ -194,16 +194,4 @@ Use semantic versioning: `v1.0.0` for the first ship-ready release, `v1.1.0` for
 
 ## 8. Possible extensions and known limitations
 
-Tracks two things together: the app's known limitations and open next-steps backlog, and larger, more speculative extensions — new data pipelines or capabilities rather than bug fixes.
-
-### Known limitations and next steps
-
-The resolved decision trail (DESTA→WB DTA 2.0 migration, natural/non-natural and developed/developing splits) is in [`Extentionslimitations.md`](Extentionslimitations.md), tracked in git. The open Explanation/Evaluation/Design next-steps list is in `todo.md` — gitignored and local-only (lives on Google Drive, not GitHub), so that link won't resolve for anyone viewing this repo online.
-
-### Trade Economist advisory agent
-
-**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in a knowledge base and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today. The knowledge-base infrastructure this extension would draw on — location, ingestion pipeline, retrieval helper, seed corpus — is specified in [`Extentionslimitations.md`](Extentionslimitations.md), since it exists on disk as scaffolding but isn't wired into the live app.
-
-**What it could do.** Explain what a country's centrality, depth, and ECI scores mean in economic terms; summarise what the literature says about mechanisms linking FTA network position to complexity outcomes; identify which partner countries the literature flags as high-value for knowledge transfer and complexity gains; compare a country's profile to literature-reported thresholds and typical ranges; and flag the app's known data limitations (2012 ECI vintage, binary centrality weights) when relevant.
-
-**What it couldn't do.** Access real-time data outside the knowledge base; run new regressions or produce quantitative estimates; speak to country-specific political or diplomatic considerations not covered in the literature corpus.
+See [`Extentionslimitations.md`](Extentionslimitations.md).
