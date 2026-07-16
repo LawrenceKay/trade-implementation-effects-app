@@ -198,7 +198,7 @@ Tracks two things together: the app's known limitations and open next-steps back
 
 ### Known limitations and next steps
 
-Moved to [`Extentionslimitations.md`](Extentionslimitations.md) — the resolved decision trail for the DESTA→WB DTA 2.0 migration, the natural/non-natural and developed/developing splits, and the open Explanation/Evaluation/Design next-steps list.
+The resolved decision trail (DESTA→WB DTA 2.0 migration, natural/non-natural and developed/developing splits) is in [`Extentionslimitations.md`](Extentionslimitations.md), tracked in git. The open Explanation/Evaluation/Design next-steps list is in `todo.md` — gitignored and local-only (lives on Google Drive, not GitHub), so that link won't resolve for anyone viewing this repo online.
 
 ### Trade Economist advisory agent
 
