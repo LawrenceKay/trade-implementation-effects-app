@@ -125,7 +125,11 @@ Known limitations, resolved design decisions, and the open next-steps list are t
 
  ## AI disclosure
 
-This repository follows the [ai-disclosure convention](https://github.com/ggfevans/ai-disclosure). See [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) for the repo-level default and scope.
+All source code was AI-generated and this repository follows the [ai-disclosure convention](https://github.com/ggfevans/ai-disclosure) for source code. See [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) for the repo-level default and scope.   
+
+All conceptualisation; economic analysis; written explanation; and consideration of policy implications were human authored. 
+
+All mathematics was AI-assisted, in that it was formalised by Claude Code and then reviewed. 
 
  ## Licence
 
