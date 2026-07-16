@@ -1,10 +1,12 @@
-# Trade partner intelligence for growth and diversification 
+# FaDalgo 
 
-The location of a country within a network of trade agreements has been found to affect the depth and breadth of its economic capabilities, and the app developed here implements that insight for policy-makers. Fan Z etal (2025) found that when a country [insert], the complexity of its good output can [insert]. The app adopts the framework of Fan Z etal (2025), with developments for usability and policy relevance. 
+FaDalgo is an implementation of Fan et al.'s 2025 paper Does centrality within trade agreements networks matter to economic complexity? The conditioning effects of network structure, which builds on the work of Cesar Hidalgo and colleagues into economic complexity. Hence 'Fa' and 'Dalgo'. 
 
- Barriers to trade, market access, and comparative advantage are the standard concepts for advising policy-makers on international trade. The lower the barriers to trade between one country and another, the more that the two will be able to search for the optimal allocation of resources according to their production capabilities. They will hence come to focus on their comparative advantages, increasing output and the gains from trade, and hence welfare for the two countries. Trade is likely to be greater when two countries are geographically closer, adjusting for economic size, as per the gravity model [insert equation].   
+We know from the econonomic complexity literature that greater complexity is correllated with higher growth. The more that economic agents know about making a wide range of products, the stronger will be there ability to combine existing knowledge into new things, thereby increasing resilience and boosting growth.
 
- Thinking about a country's trade policy in terms of its centrality within a network of trade agreements is a novel addition to the standard framework. Fan Z etal (2025) see [insert]. The app allows users to explore their framework in thinking about a country's trade policy.  
+Fan etal extend the insight of Hidalgo and others to the effects of a country's position in a network of trade agreements on its ability to access growth-boosting complexity. The greater the production complexity held in the network, the more central that the country is in it, and deeper the agreements signed with complex partners, the more access that the country will have. More access should mean higher growth. 
+
+FaDalgo allows users to explore which extra trade agreement partners would add to a selected country's complexity exposure. They choose a country of interest; are shown its current agreements and its centrality to the network of agremeents it is party to; and the complexity it is therefore exposed to. Users are suggested further partners that could be added, along the dimensions of which would add the most complexity; which would help the selected country to increase its centrality; and which would offer deep commitments that would facilitate complexity access. 
 
  ## Installation
 
