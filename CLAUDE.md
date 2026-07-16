@@ -89,11 +89,7 @@ conda activate trade-app && python centrality_pipeline.py --show
 | CT | Centrality | `overall_centrality` | Real — `centrality_scores.csv` (WB DTA 2.0 + Fan et al. method) |
 | EC | Complexity | `eci_score` | Real — `eci_scores.csv` (Harvard Atlas 2012) |
 
-## 6. Known limitations and next steps
-
-Moved to [`Extentionslimitations.md`](Extentionslimitations.md) — the resolved decision trail for the DESTA→WB DTA 2.0 migration, the natural/non-natural and developed/developing splits, and the open Explanation/Evaluation/Design next-steps list.
-
-## 7. Rules
+## 6. Rules
 
 Rules apply at all times across all stages and all app builds. They are not negotiable.
 
@@ -114,7 +110,7 @@ Rules apply at all times across all stages and all app builds. They are not nego
 - Do not pass personal or sensitive data to the Claude API without assessing data privacy implications first.
 - Flag any compliance concerns to the user immediately — do not proceed past them.
 
-## 8. Version control
+## 7. Version control
 
 **GitHub account:** `LawrenceKay`
 **Repository name:** `trade-implementation-effects-app`
@@ -123,7 +119,7 @@ Rules apply at all times across all stages and all app builds. They are not nego
 
 The app lives in its own dedicated GitHub repository, separate from any other project. Use the `gh` CLI throughout.
 
-### 8.0 Prerequisites (one-time, per machine)
+### 7.0 Prerequisites (one-time, per machine)
 
 The `gh` CLI must be installed and authenticated before running any of the steps below.
 
@@ -142,7 +138,7 @@ Verify authentication is working before proceeding:
 gh auth status
 ```
 
-### 8.1 First-time setup (once per app)
+### 7.1 First-time setup (once per app)
 
 Run these commands from inside the `trade_implementation_effects_app` directory.
 
@@ -174,7 +170,7 @@ gh repo create trade-implementation-effects-app --private --source=. --remote=or
 
 Never commit `.env` files or API keys. Add a `.env.example` file listing variable names without values so collaborators know what is needed.
 
-### 8.2 Prototype checkpoint
+### 7.2 Prototype checkpoint
 
 Run after the prototype and supporting documentation are complete and tested.
 
@@ -184,7 +180,7 @@ git commit -m "Prototype: working prototype and written outputs complete"
 git push origin master
 ```
 
-### 8.3 Release
+### 7.3 Release
 
 ```bash
 git add final_checks_report.md technical_spec.md user_guide.md
@@ -196,9 +192,13 @@ git push origin v1.0.0
 
 Use semantic versioning: `v1.0.0` for the first ship-ready release, `v1.1.0` for minor improvements, `v2.0.0` for breaking changes.
 
-## 9. Possible extensions
+## 8. Possible extensions and known limitations
 
-Larger, more speculative pieces of work that go beyond fixing a known limitation — new data pipelines or capabilities rather than bug fixes.
+Tracks two things together: the app's known limitations and open next-steps backlog, and larger, more speculative extensions — new data pipelines or capabilities rather than bug fixes.
+
+### Known limitations and next steps
+
+Moved to [`Extentionslimitations.md`](Extentionslimitations.md) — the resolved decision trail for the DESTA→WB DTA 2.0 migration, the natural/non-natural and developed/developing splits, and the open Explanation/Evaluation/Design next-steps list.
 
 ### Trade Economist advisory agent
 
