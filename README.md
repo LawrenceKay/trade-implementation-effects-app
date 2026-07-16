@@ -100,6 +100,9 @@ Academic papers relevant to the analytical framework of this app. All concern th
 Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extentionslimitations.md`](Extentionslimitations.md).
 
  ## Licence
- [Insert]
+
+MIT — see [`LICENSE`](LICENSE).
 
  ## Contact
+
+Please get in touch to discuss extensions for the app and any errors that I might have made.
