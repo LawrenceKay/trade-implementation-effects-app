@@ -97,6 +97,28 @@ Academic papers relevant to the analytical framework of this app. All concern th
 | **What it argues** | Examines how a country's position and connectivity within global agricultural trade networks drives quality upgrading of processed food exports through functional specialisation shifts in value chains. Extends the network-centrality argument to a specific sector. |
 | **Links** | [Frontiers](https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1772800/full) |
 
+### The building blocks of economic complexity
+
+| Detail | Value |
+|--------|-------|
+| **Title** | The building blocks of economic complexity |
+| **Authors** | Ricardo Hausmann, César A. Hidalgo |
+| **Journal** | Proceedings of the National Academy of Sciences (PNAS) |
+| **Year** | 2009 |
+| **What it argues** | Introduces the "product space" and the Economic Complexity Index, showing that a country's mix of exported products — and how central those products are within the product space — captures the country's underlying productive knowledge, and predicts future economic growth. This is the foundational complexity paper Fan et al. (2025) build on. |
+| **Links** | [PNAS](https://www.pnas.org/doi/10.1073/pnas.0900943106) |
+
+### The move toward free trade zones
+
+| Detail | Value |
+|--------|-------|
+| **Title** | The Move Toward Free Trade Zones |
+| **Author** | Paul R. Krugman |
+| **Journal** | Economic Review, Federal Reserve Bank of Kansas City, vol. 76 |
+| **Year** | 1991 |
+| **What it argues** | A widely-cited theoretical paper generally credited as the origin of the "natural trading partners" hypothesis — that regional trade blocs formed among geographically proximate countries raise welfare more (and risk less trade diversion) than blocs formed among distant countries. Directly relevant to this app's natural/non-natural centrality split. *Caveat: the source PDF blocks automated fetching, so this summary is from general knowledge of a well-known result rather than a direct read of this specific document — worth a manual check against the text.* |
+| **Links** | [Federal Reserve Bank of Kansas City](https://www.kansascityfed.org/documents/826/1991-The%20Move%20Toward%20Free%20Trade%20Zones.pdf) |
+
  ## Extentions and limitations
 
 Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extensionslimitations.md`](Extensionslimitations.md).

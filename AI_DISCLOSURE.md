@@ -1,5 +1,5 @@
 ---
-disclosure-default: ai-assisted
+disclosure-default: ai-generated
 models-used:
   - claude-sonnet-5
 providers:
