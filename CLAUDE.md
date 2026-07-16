@@ -47,37 +47,6 @@ Services available:
 |---------|----------|-----------------|--------|
 | Deep Trade Agreements (DTA) 2.0 | World Bank | Provisions and depth scores for 280+ trade agreements across 18 policy areas | `datatopics.worldbank.org/dta` |
 
-### Dispute Settlement and Enforcement
-
-| Dataset | Provider | What it provides | Access |
-|---------|----------|-----------------|--------|
-| Dispute Settlement Body (DSB) records | WTO | Full record of WTO dispute cases, rulings, and compliance status | `wto.org/english/tratop_e/dispu_e` |
-| ISDS Navigator | UNCTAD | Investor-state dispute settlement cases, outcomes, and treaty links | `investmentpolicy.unctad.org/isds` |
-
-### Non-Tariff Measures and Regulatory Friction
-
-| Dataset | Provider | What it provides | Access |
-|---------|----------|-----------------|--------|
-| Specific Trade Concerns (STCs) | WTO (ePing) | STC filings by country and product; in March 2026 a record 76 STCs were reviewed, signalling peak regulatory friction | `epingalert.org` / `wto.org` |
-| NTM Coverage Ratio | UNCTAD | Share of trade affected by non-tariff measures; TBTs and technical regulations now affect two-thirds of world trade (Jan 2026) | `unctad.org/topic/trade-analysis/non-tariff-measures` |
-| TRAINS — Non-Tariff Measures | UNCTAD via WITS | Full NTM database by country, product, and measure type | `wits.worldbank.org` |
-| Ad Valorem Equivalent (AVE) of NTMs | World Bank (WITS) | Tariff-equivalent cost estimates for non-tariff barriers | `wits.worldbank.org` |
-
-### Trade Flows and Distortions
-
-| Dataset | Provider | What it provides | Access |
-|---------|----------|-----------------|--------|
-| Global Trade Alert (GTA) | Simon Evenett / GTA | Real-time database of trade policy interventions — liberalising and distorting — since 2008 | `globaltradealert.org` |
-| BACI — International Trade Database | CEPII | Harmonised bilateral trade flows at HS6 level | `cepii.fr` |
-| WITS — Trade Flows and Tariff Schedules | World Bank | Bilateral trade flows, tariff schedules, NTMs | `wits.worldbank.org` / `wbdata` |
-
-### Standards and Conformity
-
-| Dataset | Provider | What it provides | Access |
-|---------|----------|-----------------|--------|
-| UK DMAS / EU SEP | UK DBT / European Commission | Designated standards and standardisation request pipeline under UK and EU trade regimes | `gov.uk/dmas` / `ec.europa.eu/growth/single-market` |
-| UK/EU PUR Data | UK DBT / European Commission | Product under review data for conformity assessment and mutual recognition | `gov.uk` / `ec.europa.eu` |
-
 ## 5. Current build state
 
 ### Scripts
@@ -135,7 +104,7 @@ conda activate trade-app && python centrality_pipeline.py --show
   - **Done (task 7 of the migration): `network_example.py`'s independent DESTA loader rebuilt on WB DTA 2.0.** This loader never went through `centrality_pipeline.py` — it read `data/raw/desta_dyads.csv` directly to build `PARTNER_MAP`/`AGREEMENTS_MAP`/`PAIR_AGREEMENTS` (agreement names, per-country and per-pair). Following the existing architecture pattern (the app reads processed CSVs, not raw source files — as it already does for `centrality_scores.csv`/`eci_scores.csv`), added a new `centrality_pipeline.py` output, `data/processed/agreements.csv` (columns: `iso1, iso2, WBID, agreement, entry_year`), built inside `load_wb_dta()` from the same Status-filtered `bilateral` data already used for depth scoring, joined to the `Agreements` sheet for agreement names. `network_example.py`'s loader rewritten to read this file instead of raw DESTA — no more numeric-ISO-to-alpha3 conversion needed (WB DTA 2.0 already uses alpha-3), no more `import pycountry` in this block. **Verified**: 17,375 pair-agreement rows generated, 0 NaN agreement names; spot-checked Vietnam retains multiple distinct agreements with the same partner where real (e.g. Australia: ASEAN, CPTPP, RCEP each as separate rows) — the same multi-agreement-per-pair structure the old DESTA-based loader supported, now with real WB DTA 2.0 data instead.
   - **Done (task 8 of the migration): remaining "DESTA" text/comments in `network_example.py` updated.** Two module-level comments describing where `n_agreements`/`avg_enforceable` etc. come from, one code comment on `has_dta_coverage`, and two **UI-visible** strings ("hover to view list · DESTA records" and "No DESTA records found.") all updated to reflect WB DTA 2.0. `grep -i desta network_example.py` now returns zero matches.
   - **Done (tasks 9–10): pipeline re-run and app click-through verified end to end.** Re-ran `centrality_pipeline.py` after tasks 7–8 (0 NaNs, 0 negatives, 210 countries). Relaunched the running app instance and selected Vietnam: the "N FTAs on record" figure changed from 27 (old DESTA count) to **16**, correctly matching the WB-DTA-2.0-derived `n_agreements` in `centrality_scores.csv` — direct confirmation that `AGREEMENTS_MAP` is now genuinely sourced from WB DTA 2.0, not a stale cached DESTA value. Group-simulation panel, recommended-partners tables, and the network graph all rendered correctly with no errors.
-  - **Task 11: migration complete.** Summary of what changed across all 8 executed tasks: network topology, edge depth, `n_agreements`, `n_partners`, region classification, and the app's agreement-listing UI are now **all** sourced from WB DTA 2.0 alone. Key behavioural differences from the pre-migration DESTA-based app, all deliberate and documented above: (1) the network reflects agreements **currently in force**, not a cumulative "ever existed" history (task 1); (2) entry-date timing is **goods-focused**, not services (task 1); (3) 20 small territories now have an explicit, documented region classification (task 4) instead of an inconsistent DESTA-fallback-or-nothing outcome; (4) `n_agreements`/`n_partners`/depth figures are generally lower than the old DESTA-based counts, since superseded/historical agreements no longer count. Not yet touched by this migration: the `--year` historical-mode flag, ECI (still Harvard's 2012 snapshot, see Section 13), and the two still-open Section 5 items below.
+  - **Task 11: migration complete.** Summary of what changed across all 8 executed tasks: network topology, edge depth, `n_agreements`, `n_partners`, region classification, and the app's agreement-listing UI are now **all** sourced from WB DTA 2.0 alone. Key behavioural differences from the pre-migration DESTA-based app, all deliberate and documented above: (1) the network reflects agreements **currently in force**, not a cumulative "ever existed" history (task 1); (2) entry-date timing is **goods-focused**, not services (task 1); (3) 20 small territories now have an explicit, documented region classification (task 4) instead of an inconsistent DESTA-fallback-or-nothing outcome; (4) `n_agreements`/`n_partners`/depth figures are generally lower than the old DESTA-based counts, since superseded/historical agreements no longer count. Not yet touched by this migration: the `--year` historical-mode flag, ECI (still Harvard's 2012 snapshot, see Section 9), and the two still-open Section 5 items below.
   - **Follow-up (2026-07-14): DESTA data and the separate `desta_design` institutional-quality metric removed entirely.** `data/raw/desta_dyads.csv` deleted (nothing read it after task 6/7); `pycountry` removed from `requirements.txt` and the Section 3 tech-stack table (its only use anywhere was DESTA's numeric-ISO conversion, now gone from both files). Separately, `score.py`'s `desta_design` commitment measure (and its docstring line) and `pipeline.py`'s corresponding `desta.csv` loading code removed — `compute_scores()` already handled missing indicators gracefully (mean over whichever columns are present), so this is a clean removal with no scoring-logic changes; verified with a synthetic test dataframe. Note `desta_design` was already a silent no-op before this — its source file, `data/raw/desta.csv`, never existed on disk, so it never actually contributed to any score. Section 4's "DESTA — Design of Trade Agreements" data-source row removed accordingly. This item, the "Agreement/provision values" item above, and the sidebar-buttons table were also swept for stale "(DESTA...)" data-source labels that had been missed when earlier tasks were completed (AG/PT/CT rows were describing pre-task-3/4 state).
 - **"Non-natural" split is a coarser proxy — RESOLVED (2026-07-14)**: Fan et al. classify a partner as "natural" using actual bilateral geographic distance vs. the average. `centrality_pipeline.py`'s `split_natural_nonnatural()` used to flag same-World-Bank-region as "natural" — a reasonable but not equivalent test (e.g. two same-region countries far apart would count as "natural" for us but might not for them), a case of measurement error in a categorical proxy that tends to *attenuate* the true natural/non-natural contrast Fan et al. found. Replaced with real CEPII bilateral distance data.
   - **Data source — resolved**: `data/raw/dist_cepii.dta` downloaded from CEPII's official GeoDist page (`cepii.fr/distance/dist_cepii.dta`, Etalab 2.0 open licence — see Mayer & Zignago 2011, "Notes on CEPII's distances measures: the GeoDist Database", CEPII Working Paper 2011-25). Verified structure directly: 50,176 rows (224 × 224 countries, incl. self-pairs), columns `iso_o`, `iso_d`, `contig`, `comlang_off`, `comlang_ethno`, `colony`, `comcol`, `curcol`, `col45`, `smctry`, and four distance measures — `dist`, `distcap`, `distw`, `distwces`.
@@ -154,7 +123,6 @@ conda activate trade-app && python centrality_pipeline.py --show
 
 - **Adopt AI-disclosure convention**: adopt the guidance at [ggfevans/ai-disclosure](https://github.com/ggfevans/ai-disclosure) — add an `AI_DISCLOSURE.md` at the repo root (YAML frontmatter: `disclosure-default`, `models-used`, `providers`, `scope`, `last-updated`) and start adding `SPDX-AI-Disclosure:` file-level headers to new or substantially-modified files going forward. Do not retroactively annotate the whole existing repo at once — the convention explicitly recommends against that.
 - **Rewrite Section 4 ("Data sources") in Lawrence's own language.** The section currently reads as an auto-generated reference table; put it into Lawrence's own words.
-- **Prune Section 4 to sources actually wired into the app.** Only the first sub-section (WB DTA 2.0 + Harvard Atlas) is consumed by `centrality_pipeline.py`/`network_example.py` today — Dispute Settlement (DSB/ISDS), Non-Tariff Measures (STCs/NTM Coverage/TRAINS/AVE), Trade Flows (GTA/BACI/WITS), and Standards (DMAS/SEP/PUR) are not read by any script. Remove these, or keep them only if explicitly flagged as a future-sourcing shortlist rather than implying they're live.
 - **Rewrite the Scripts subsection of Section 5 in Lawrence's own language.** Currently an auto-generated table describing `network_example.py` and `centrality_pipeline.py`.
 - **Reframe "Known limitations and next steps" as a "Design decisions" section.** Nearly every entry under this heading is now marked RESOLVED and documents a decision made (e.g. which WB DTA 2.0 rows count as an edge, which distance column to use) rather than an outstanding limitation — the heading no longer matches most of the content. Move resolved decision-trail entries under a "Design decisions" heading; keep only genuinely open items (AI-disclosure, orphaned `wbdata` dependency, and this list) under "next steps."
 - **Update the GitHub repository's description field** for `trade-implementation-effects-app` to match the app's current two-pillar (centrality + complexity) scope, since the institutional-quality pillar was removed.
@@ -202,19 +170,7 @@ Rules apply at all times across all stages and all app builds. They are not nego
 - Do not pass personal or sensitive data to the Claude API without assessing data privacy implications first.
 - Flag any compliance concerns to the user immediately — do not proceed past them.
 
-## 7. Skills
-
-_To be defined._
-
-## 8. Agents
-
-_None implemented. A Trade Economist advisory agent was previously specified here in detail; that spec described functionality that was never built. See Section 13 ("Possible extensions") for a summary of what such an agent could do._
-
-## 9. Orchestrator
-
-_To be defined._
-
-## 10. Knowledge Base
+## 7. Knowledge Base
 
 **Location.** `knowledge_base/` at the project root.
 
@@ -251,9 +207,9 @@ knowledge_base/
 
 **Retrieval helper (`retrieve.py`).** Accepts a query string and optional theme filter; returns the top-k chunks as a formatted string with inline source labels ready to paste into a prompt.
 
-**Seed corpus.** The four papers listed in Section 12 (Fan et al. 2025; Sopranzetti 2018; Yang & Liu 2024; Guo 2026) are the initial seed documents. All are publicly available. Additional documents should be cleared for licence before ingestion (see Rules, Section 6).
+**Seed corpus.** The four papers listed in the README's "Complementary literature" section (Fan et al. 2025; Sopranzetti 2018; Yang & Liu 2024; Guo 2026) are the initial seed documents. All are publicly available. Additional documents should be cleared for licence before ingestion (see Rules, Section 6).
 
-## 11. Version control
+## 8. Version control
 
 **GitHub account:** `LawrenceKay`
 **Repository name:** `trade-implementation-effects-app`
@@ -262,7 +218,7 @@ knowledge_base/
 
 The app lives in its own dedicated GitHub repository, separate from any other project. Use the `gh` CLI throughout.
 
-### 11.0 Prerequisites (one-time, per machine)
+### 8.0 Prerequisites (one-time, per machine)
 
 The `gh` CLI must be installed and authenticated before running any of the steps below.
 
@@ -281,7 +237,7 @@ Verify authentication is working before proceeding:
 gh auth status
 ```
 
-### 11.1 First-time setup (once per app)
+### 8.1 First-time setup (once per app)
 
 Run these commands from inside the `trade_implementation_effects_app` directory.
 
@@ -313,7 +269,7 @@ gh repo create trade-implementation-effects-app --private --source=. --remote=or
 
 Never commit `.env` files or API keys. Add a `.env.example` file listing variable names without values so collaborators know what is needed.
 
-### 11.2 Prototype checkpoint
+### 8.2 Prototype checkpoint
 
 Run after the prototype and supporting documentation are complete and tested.
 
@@ -323,7 +279,7 @@ git commit -m "Prototype: working prototype and written outputs complete"
 git push origin master
 ```
 
-### 11.3 Release
+### 8.3 Release
 
 ```bash
 git add final_checks_report.md technical_spec.md user_guide.md
@@ -335,61 +291,13 @@ git push origin v1.0.0
 
 Use semantic versioning: `v1.0.0` for the first ship-ready release, `v1.1.0` for minor improvements, `v2.0.0` for breaking changes.
 
-## 12. Resources
-
-Academic papers relevant to the analytical framework of this app. All concern the network structure of free trade agreements and its effects on trade, complexity, and value chains.
-
-### Trade agreement networks and economic complexity
-
-| Detail | Value |
-|--------|-------|
-| **Title** | Does centrality within trade agreements network matter to economic complexity? The conditioning effects of network structure |
-| **Authors** | Zhaobin Fan, Rui Long, Sajid Anwar, Jinrui Wang |
-| **Journal** | International Review of Economics & Finance |
-| **Year** | 2025 |
-| **What it argues** | A country's centrality in the FTA network yields both a breadth effect (exposure to diverse partners) and a depth effect (access to deeper knowledge transfer), both of which raise economic complexity. The conditioning effect is stronger when central links involve diverse or high-income partners. |
-| **Links** | [ScienceDirect](https://www.sciencedirect.com/science/article/pii/S1059056025000553#sec3) · [IDEAS/RePEc](https://ideas.repec.org/a/eee/reveco/v98y2025ics1059056025000553.html) |
-
-### Overlapping FTAs and international trade flows
-
-| Detail | Value |
-|--------|-------|
-| **Title** | Overlapping free trade agreements and international trade: A network approach |
-| **Author** | Sergio Sopranzetti |
-| **Journal** | The World Economy |
-| **Year** | 2018 |
-| **What it argues** | Characterises the global FTA network and shows that overlapping agreements create a "spaghetti bowl" structure; network centrality and clustering significantly affect bilateral trade flows beyond the direct effect of any single agreement. |
-| **Links** | [Working paper (Fondazione Masi)](https://fondazionemasi.it/public/masi/files/PUBBLICAZIONI/WorkingPaper/Overlappingfreetradeagreements.pdf) |
-
-### FTA networks and domestic value added in exports
-
-| Detail | Value |
-|--------|-------|
-| **Title** | Free trade agreements and domestic value added in exports: An analysis from the network perspective |
-| **Authors** | Yichen Yang, Wen Liu |
-| **Journal** | Economic Modelling |
-| **Year** | 2024 |
-| **What it argues** | Using structural gravity modelling across 60 countries (2007–2017), shows that a country's position in the FTA network — not just whether it has agreements — determines how much domestic value is captured in its exports. Network centrality amplifies the domestic value-added gains from trade. |
-| **Links** | [ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S0264999324000129) |
-
-### Global value chain networks and agricultural product quality
-
-| Detail | Value |
-|--------|-------|
-| **Title** | Embedding in global value chains: the impact of trade networks on the quality upgrading of processed agricultural products |
-| **Author** | Qianqian Guo |
-| **Journal** | Frontiers in Sustainable Food Systems |
-| **Year** | 2026 |
-| **What it argues** | Examines how a country's position and connectivity within global agricultural trade networks drives quality upgrading of processed food exports through functional specialisation shifts in value chains. Extends the network-centrality argument to a specific sector. |
-| **Links** | [Frontiers](https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1772800/full) |
-
-## 13. Possible extensions
+## 9. Possible extensions
 
 Larger, more speculative pieces of work that go beyond fixing a known limitation — new data pipelines or capabilities rather than bug fixes.
 
 ### Trade Economist advisory agent
 
-**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in the knowledge base (Section 10) and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today.
+**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in the knowledge base (Section 7) and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today.
 
 **What it could do.** Explain what a country's centrality, depth, and ECI scores mean in economic terms; summarise what the literature says about mechanisms linking FTA network position to complexity outcomes; identify which partner countries the literature flags as high-value for knowledge transfer and complexity gains; compare a country's profile to literature-reported thresholds and typical ranges; and flag the app's known data limitations (2012 ECI vintage, binary centrality weights) when relevant.
 
