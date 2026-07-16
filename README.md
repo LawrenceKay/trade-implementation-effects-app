@@ -1,6 +1,6 @@
 # FaDalgo 
 
-FaDalgo is an implementation of Fan et al.'s 2025 paper Does centrality within trade agreements networks matter to economic complexity? The conditioning effects of network structure, which builds on the work of Cesar Hidalgo and colleagues into economic complexity. Hence 'Fa' and 'Dalgo'. 
+FaDalgo is an implementation of Fan et al.'s 2025 paper [*Does centrality within trade agreements networks matter to economic complexity? The conditioning effects of network structure*](https://www.sciencedirect.com/science/article/pii/S1059056025000553#sec3), which builds on the work of Cesar Hidalgo and colleagues into economic complexity. Hence 'Fa' and 'Dalgo'. 
 
 We know from the econonomic complexity literature that greater complexity is correllated with higher economic growth. The more that agents know about making a wide range of products, the stronger will be their ability to combine existing knowledge into new things, thereby increasing resilience and boosting growth.
 
