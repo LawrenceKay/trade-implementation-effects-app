@@ -1,3 +1,9 @@
+## Limitations
+
+The simulation of adding new trade partners is static. When new countries are added to a country's network the
+user is only given a score that represents the greater complexity exposure that it will enjoy. There is no
+calculation of how it will dynamically affect the country's output profile. 
+
 ## Possible extensions
 
 Larger, more speculative pieces of work that go beyond fixing a known limitation — new data pipelines or capabilities rather than bug fixes.
