@@ -101,6 +101,10 @@ Academic papers relevant to the analytical framework of this app. All concern th
 
 Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extensionslimitations.md`](Extensionslimitations.md).
 
+ ## AI disclosure
+
+This repository follows the [ai-disclosure convention](https://github.com/ggfevans/ai-disclosure). See [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) for the repo-level default and scope.
+
  ## Licence
 
 MIT — see [`LICENSE`](LICENSE).
