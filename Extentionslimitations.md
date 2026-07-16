@@ -65,6 +65,8 @@
 
 This is infrastructure for the not-yet-built Trade Economist advisory agent (see CLAUDE.md Section 8, "Possible extensions and known limitations"). The scaffolding below exists on disk at `knowledge_base/` but is **not wired into the live app** — `network_example.py` and `centrality_pipeline.py` have zero references to it. Grounding the agent's answers in this literature corpus, with inline source citations rather than unsupported claims, is how that extension would be implemented.
 
+**Dependency note (2026-07-16):** `chromadb` and `sentence-transformers`, which `ingest.py` and `retrieve.py` both need, were removed from the repo's root `requirements.txt` when trimming it for a lean Streamlit Community Cloud deploy of `network_example.py` (which doesn't need them). `ingest.py` also imports `pypdf`, which was never in `requirements.txt` to begin with. Anyone actually running the knowledge-base scripts needs to `pip install chromadb sentence-transformers pypdf` separately — this isn't yet captured in its own requirements file.
+
 **Location.** `knowledge_base/` at the project root.
 
 **Structure.**
