@@ -1,9 +1,9 @@
 """
 network_example.py — Trade Partner Intelligence
 ================================================
-Streamlit app with two analytical lenses:
-  1. Trade agreement network centrality  (3D force-directed graph)
-  2. Economic complexity                 (ECI dashboard)
+A Streamlit app that allows the user to gauge the combination of a country's position
+in a network of trade agreements, and its access to economic complexity from across
+the network. 
 
 Run:
     conda activate trade-app && streamlit run network_example.py

@@ -1,27 +1,32 @@
 """
 centrality_pipeline.py
 ======================
-Computes FTA-network eigenvector centrality following Fan et al. (2025):
-"Does centrality within trade agreements network matter to economic complexity?"
-International Review of Economics & Finance, 98.
+Computes the eigenvector centrality of a country within the network of trade agreements 
+it has signed, using the method of Fan et al (2025) "Does centrality within trade agreements 
+network matter to economic complexity?". Basically, the centrality of a country is found through
+the manipulation of squares of numbers -- matrices -- that represent the agreements that it is a
+party to. Each country starts with its own square, which is then combined with all other countries,
+the depth of the agreement of those other countries, and the centrality in their networks brought by
+those countries. This leads to a centrality score for all countries. 
 
-Method (Fan et al. eq. 1):
-    Centrality_i = λ⁻¹ · Σⱼ Depth_ij · eⱼ
-
-where Depth_ij = count of binary (yes/no) provisions coded 1 for the deepest
-agreement between countries i and j, per WB DTA 2.0 "Vertical Content" data
-(1,007 scoreable provisions across ~20 policy areas; 64 categorical/
-multiple-choice items in the same sheet are excluded — see load_dta_depth()),
+The Fan et al (2025) equation is centrality_i = λ⁻¹ · Σⱼ Depth_ij · eⱼ, where 
+Depth_ij is a binary count of whether the countries i and j have a provision 
+according to the list of available ones as per WB DTA 2.0 "Vertical Content" for
+which there are data 1,007 scoreable provisions across approximately 20 policy areas. 
 λ = largest eigenvalue, e = eigenvector.
 
-Note: DTA 2.0's provision set is more granular than the Hofmann et al. (2017)
-0–52 WTO+/WTO-X coding used in DTA 1.0 (and than the "0–48 scale" referenced
-in earlier CLAUDE.md notes), so absolute depth values here are NOT on the same
-scale as Fan et al.'s published figures — only the relative ordering across
-agreements is comparable. Eigenvector centrality is invariant to a positive
-rescaling of all edge weights, so this does not affect the centrality ranking.
+Depth is drawn from DTA 2.0, which is more granular than the Hofmann et al (2017)
+coding used by Fan etal (2025). Absolute depth values are therefore not the same as in
+Fan etal (2025), but the relative ordering persists. This does not affect the 
+centrality ranking. 
 
-Five centrality variants are computed:
+Five types of centrality are computed to reflect the Fan et al (2025) approach and the 
+underlying literature from Paul Krugman. In short, countries are thought to have 'natural'
+trade partners which are their geographic neighbours, and for these to have similar production
+profiles. They are also divided into 'developed' and 'developing' groups. Partnering with non-natural 
+countries tends to raise complexity access, as does developing countries doing so with developed ones.
+
+The centrality variants are as follows: 
   • overall_centrality  — all FTA partners
   • nn_centrality       — via "non-natural" partners (CEPII bilateral
                           distance above the country's own average — H2)
@@ -30,10 +35,6 @@ Five centrality variants are computed:
   • ed_centrality       — via connections to "Developed" (WB high-income,
                           minus 5 oil-rich exclusions) partners (H3)
   • ing_centrality      — via connections to "Developing" partners (H3)
-
-Fan et al. find nn_centrality has a significantly larger effect on ECI (β=0.298***)
-while n_centrality is not significant once controls are added. ed_centrality has
-the largest effect of all (β=3.514***).
 
 ─────────────────────────────────────────────────────────────────────────────────
 DATA REQUIRED (download once, place in data/raw/)
