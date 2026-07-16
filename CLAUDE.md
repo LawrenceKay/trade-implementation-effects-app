@@ -38,7 +38,7 @@ Services available:
 
 | Dataset | Provider | What it provides | Access |
 |---------|----------|-----------------|--------|
-| WB DTA 2.0 — Bilateral Information | World Bank | Country-pair-year panel keyed by WBID; sole source of FTA network topology, depth, and eigenvector centrality (see `Extentionslimitations.md`, "Base network source mismatch") | `datatopics.worldbank.org/dta` → Saved to `data/raw/DTA 2.0 - Vertical Content (v2).xlsx` |
+| WB DTA 2.0 — Bilateral Information | World Bank | Country-pair-year panel keyed by WBID; sole source of FTA network topology, depth, and eigenvector centrality (see `Extensionslimitations.md`, "Base network source mismatch") | `datatopics.worldbank.org/dta` → Saved to `data/raw/DTA 2.0 - Vertical Content (v2).xlsx` |
 | Harvard Atlas of Economic Complexity (country-year) | Harvard Growth Lab (CID) | ECI scores by country and year; 2012 data downloaded from CID GitHub | `github.com/cid-harvard/atlas-data` → `Atlas/new_observatory_cy.csv` · Processed to `data/processed/eci_scores.csv` |
 
 ### Trade Agreements — Structure and Design
@@ -194,4 +194,4 @@ Use semantic versioning: `v1.0.0` for the first ship-ready release, `v1.1.0` for
 
 ## 8. Possible extensions and known limitations
 
-See [`Extentionslimitations.md`](Extentionslimitations.md).
+See [`Extensionslimitations.md`](Extensionslimitations.md).

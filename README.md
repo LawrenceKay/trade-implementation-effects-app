@@ -28,7 +28,7 @@ conda activate trade-app && python centrality_pipeline.py --show
 
 | Dataset | Provider | What it provides | Access |
 |---------|----------|-----------------|--------|
-| WB DTA 2.0 — Bilateral Information | World Bank | Country-pair-year panel keyed by WBID; sole source of FTA network topology, depth, and eigenvector centrality (see `Extentionslimitations.md`, "Base network source mismatch") | `datatopics.worldbank.org/dta` → Saved to `data/raw/DTA 2.0 - Vertical Content (v2).xlsx` |
+| WB DTA 2.0 — Bilateral Information | World Bank | Country-pair-year panel keyed by WBID; sole source of FTA network topology, depth, and eigenvector centrality (see `Extensionslimitations.md`, "Base network source mismatch") | `datatopics.worldbank.org/dta` → Saved to `data/raw/DTA 2.0 - Vertical Content (v2).xlsx` |
 | Harvard Atlas of Economic Complexity (country-year) | Harvard Growth Lab (CID) | ECI scores by country and year; 2012 data downloaded from CID GitHub | `github.com/cid-harvard/atlas-data` → `Atlas/new_observatory_cy.csv` · Processed to `data/processed/eci_scores.csv` |
 
 #### Trade Agreements — Structure and Design
@@ -99,7 +99,7 @@ Academic papers relevant to the analytical framework of this app. All concern th
 
  ## Extentions and limitations
 
-Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extentionslimitations.md`](Extentionslimitations.md).
+Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extensionslimitations.md`](Extensionslimitations.md).
 
  ## Licence
 
