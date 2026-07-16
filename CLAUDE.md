@@ -89,11 +89,11 @@ conda activate trade-app && python centrality_pipeline.py --show
 | CT | Centrality | `overall_centrality` | Real — `centrality_scores.csv` (WB DTA 2.0 + Fan et al. method) |
 | EC | Complexity | `eci_score` | Real — `eci_scores.csv` (Harvard Atlas 2012) |
 
-### Known limitations and next steps
+## 6. Known limitations and next steps
 
 Moved to [`Extentionslimitations.md`](Extentionslimitations.md) — the resolved decision trail for the DESTA→WB DTA 2.0 migration, the natural/non-natural and developed/developing splits, and the open Explanation/Evaluation/Design next-steps list.
 
-## 6. Rules
+## 7. Rules
 
 Rules apply at all times across all stages and all app builds. They are not negotiable.
 
@@ -113,45 +113,6 @@ Rules apply at all times across all stages and all app builds. They are not nego
 - Do not store personal or third-party data in the knowledge base without explicit permission.
 - Do not pass personal or sensitive data to the Claude API without assessing data privacy implications first.
 - Flag any compliance concerns to the user immediately — do not proceed past them.
-
-## 7. Knowledge Base
-
-**Location.** `knowledge_base/` at the project root.
-
-**Structure.**
-
-```
-knowledge_base/
-  raw/                        # Source documents before ingestion
-    fta_networks/             # Papers on FTA network structure and trade flows
-    economic_complexity/      # Papers on ECI, product space, complexity theory
-    agreement_depth/          # Papers on PTA depth, provisions, and enforcement
-  vectordb/                   # ChromaDB persistent store (gitignored)
-  sources.csv                 # Metadata registry for all ingested documents
-  ingest.py                   # Ingestion script: chunk → embed → store
-  retrieve.py                 # Retrieval helper: query → top-k chunks
-```
-
-**Sources.csv schema.** One row per document.
-
-| Column | Description |
-|--------|-------------|
-| `id` | Unique slug (e.g. `fan_etal_2025`) |
-| `title` | Full title |
-| `authors` | Comma-separated author surnames |
-| `year` | Publication year |
-| `journal` | Journal or publisher |
-| `theme` | One of: `fta_networks`, `economic_complexity`, `agreement_depth` |
-| `layer` | `academic` or `policy` |
-| `file` | Relative path to the raw document |
-| `licence` | Licence or access status |
-| `notes` | Any ingestion caveats |
-
-**Ingestion pipeline (`ingest.py`).** Reads each document in `raw/`, splits into chunks of ~500 tokens with 50-token overlap, embeds using `sentence-transformers/all-MiniLM-L6-v2`, and upserts into a ChromaDB collection named `trade_knowledge`. Metadata stored per chunk: `id`, `authors`, `year`, `title`, `theme`.
-
-**Retrieval helper (`retrieve.py`).** Accepts a query string and optional theme filter; returns the top-k chunks as a formatted string with inline source labels ready to paste into a prompt.
-
-**Seed corpus.** The four papers listed in the README's "Complementary literature" section (Fan et al. 2025; Sopranzetti 2018; Yang & Liu 2024; Guo 2026) are the initial seed documents. All are publicly available. Additional documents should be cleared for licence before ingestion (see Rules, Section 6).
 
 ## 8. Version control
 
@@ -241,7 +202,7 @@ Larger, more speculative pieces of work that go beyond fixing a known limitation
 
 ### Trade Economist advisory agent
 
-**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in the knowledge base (Section 7) and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today.
+**Idea.** A conversational agent embedded in the app that would let the user interrogate a selected country's trade position across the three dimensions the app measures — FTA network centrality, agreement depth and breadth, and economic complexity — grounding its answers in the academic literature held in a knowledge base and citing sources rather than generating unsupported claims. Not yet built: no chat interface exists in `network_example.py` today. The knowledge-base infrastructure this extension would draw on — location, ingestion pipeline, retrieval helper, seed corpus — is specified in [`Extentionslimitations.md`](Extentionslimitations.md), since it exists on disk as scaffolding but isn't wired into the live app.
 
 **What it could do.** Explain what a country's centrality, depth, and ECI scores mean in economic terms; summarise what the literature says about mechanisms linking FTA network position to complexity outcomes; identify which partner countries the literature flags as high-value for knowledge transfer and complexity gains; compare a country's profile to literature-reported thresholds and typical ranges; and flag the app's known data limitations (2012 ECI vintage, binary centrality weights) when relevant.
 

@@ -59,3 +59,44 @@
 
 - **Recolour the app — RESOLVED (2026-07-15)**: the app now uses the image at `assets/visax-FpkeKQlgJtI-unsplash.jpg` (a dark, teal/cyan particle-wave visualization) as a fixed backdrop behind the whole page, with the rest of the styling redesigned around it — light UI chrome (white cards, white sidebar, white dropdown menus) replaced with a dark "glass" panel system (translucent, blurred backgrounds; light text) so the backdrop reads through. `COLOR_BLUE` (`#004B87`) is kept only for opaque solid-fill elements (badges, active pills) where it was already working; a new `COLOR_CYAN` (`#4DD8E8`), pulled from the image's own wave colour, replaces it everywhere it was previously used as *text* on a card, since the original dark navy had too little contrast against a dark panel. `COLOR_RED` brightened from `#C0392B` to `#E8564B` for the same reason. The seven WB-region colours (map/network legend) were also brightened for visibility against the dark 3D graph and legend panel. Added `.streamlit/config.toml` (`[theme] base="dark"`, matching palette) so native Streamlit widget chrome not covered by the app's own CSS follows suit, and a cached `_load_backdrop_b64()` helper that downsizes the (large, 8750×12667px) source image to a sane width before base64-embedding it, so the page payload stays reasonable. `Pillow` added to `requirements.txt` for this. Verified by running the app and checking the home page, country analysis view, score-card hover panels, dropdown menus, and the 3D network graph.
   - **Follow-up (2026-07-16): photo credit added.** Unsplash's licence doesn't require attribution but requests it as good practice, so a small, low-opacity credit line was added to the bottom of the page in `network_example.py` (`render_home()`): "Photo by [Visax](https://unsplash.com/@visaxslr) on [Unsplash](https://unsplash.com/photos/a-black-background-with-a-wavy-pattern-FpkeKQlgJtI)."
+
+## Knowledge Base
+
+This is infrastructure for the not-yet-built Trade Economist advisory agent (see CLAUDE.md Section 9, "Possible extensions"). The scaffolding below exists on disk at `knowledge_base/` but is **not wired into the live app** — `network_example.py` and `centrality_pipeline.py` have zero references to it. Grounding the agent's answers in this literature corpus, with inline source citations rather than unsupported claims, is how that extension would be implemented.
+
+**Location.** `knowledge_base/` at the project root.
+
+**Structure.**
+
+```
+knowledge_base/
+  raw/                        # Source documents before ingestion
+    fta_networks/             # Papers on FTA network structure and trade flows
+    economic_complexity/      # Papers on ECI, product space, complexity theory
+    agreement_depth/          # Papers on PTA depth, provisions, and enforcement
+  vectordb/                   # ChromaDB persistent store (gitignored)
+  sources.csv                 # Metadata registry for all ingested documents
+  ingest.py                   # Ingestion script: chunk → embed → store
+  retrieve.py                 # Retrieval helper: query → top-k chunks
+```
+
+**Sources.csv schema.** One row per document.
+
+| Column | Description |
+|--------|-------------|
+| `id` | Unique slug (e.g. `fan_etal_2025`) |
+| `title` | Full title |
+| `authors` | Comma-separated author surnames |
+| `year` | Publication year |
+| `journal` | Journal or publisher |
+| `theme` | One of: `fta_networks`, `economic_complexity`, `agreement_depth` |
+| `layer` | `academic` or `policy` |
+| `file` | Relative path to the raw document |
+| `licence` | Licence or access status |
+| `notes` | Any ingestion caveats |
+
+**Ingestion pipeline (`ingest.py`).** Reads each document in `raw/`, splits into chunks of ~500 tokens with 50-token overlap, embeds using `sentence-transformers/all-MiniLM-L6-v2`, and upserts into a ChromaDB collection named `trade_knowledge`. Metadata stored per chunk: `id`, `authors`, `year`, `title`, `theme`.
+
+**Retrieval helper (`retrieve.py`).** Accepts a query string and optional theme filter; returns the top-k chunks as a formatted string with inline source labels ready to paste into a prompt.
+
+**Seed corpus.** The four papers listed in the README's "Complementary literature" section (Fan et al. 2025; Sopranzetti 2018; Yang & Liu 2024; Guo 2026) are the initial seed documents. All are publicly available. Additional documents should be cleared for licence before ingestion (see CLAUDE.md Rules, Section 7).
