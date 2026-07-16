@@ -44,6 +44,7 @@
 
 - **Evaluate the app, and evaluate evaluation tools themselves, perhaps using Langsmith, Arize, Maze, or Posthog — including running the codebase through an evaluation agent (e.g. `/code-review`), not yet done since the DESTA→WB DTA 2.0 migration and the other CLAUDE.md Section 5 fixes above.** Covers three dimensions: code-level review via `/code-review`; LLM/agent-eval platforms (Langsmith, Arize) for grading the Trade Economist agent's output faithfulness once built; and usability-testing platforms (Maze, Posthog) for the app's UI. Needs a decision on which tool(s) are worth the setup cost for an app this size, not just which are best in the abstract.
 - **Test against country case studies.** Run known real-world cases (e.g. a country whose FTA network position and complexity trajectory are well documented in the literature) through the app and check whether its centrality/depth/complexity output matches what's already understood about that country, as a sanity check on the underlying metrics rather than just the UI.
+- **Test launching the app as a new user.** Follow README.md's Installation section from a clean checkout (no pre-existing conda env, no prior familiarity with the codebase) and confirm the app actually launches end to end — checks that the documented steps are complete and correct, not just that Lawrence's own already-configured machine can run it.
 
 ## Design
 
