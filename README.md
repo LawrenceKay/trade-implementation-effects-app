@@ -60,6 +60,10 @@ Academic papers relevant to the analytical framework of this app. All concern th
 | **What it argues** | Examines how a country's position and connectivity within global agricultural trade networks drives quality upgrading of processed food exports through functional specialisation shifts in value chains. Extends the network-centrality argument to a specific sector. |
 | **Links** | [Frontiers](https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1772800/full) |
 
+ ## Extentions and limitations
+
+Known limitations, resolved design decisions, and the open next-steps list are tracked separately in [`Extentionslimitations.md`](Extentionslimitations.md).
+
  ## Licence
  [Insert]
 
