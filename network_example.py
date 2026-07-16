@@ -30,7 +30,7 @@ from PIL import Image
 # ══════════════════════════════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="Trade Partner Intelligence for Growth and Diversification",
+    page_title="FaDalgo",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -1187,14 +1187,31 @@ def render_home():
     sel_partners = PARTNER_MAP.get(sel, set()) if sel else set()
 
     st.markdown(
-        '<div class="page-title">Trade partner intelligence for growth and diversification</div>',
+        '<div class="page-title">FaDalgo</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
         '<div style="font-size:17px;color:#EAF1F7;margin-top:2px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
-        'Countries that place themselves in networks of trade agreements that contain deep and sophisticated '
-        'production capabilities are likely to grow faster. Use the app to learn how your countries of '
-        'interest can do so.'
+        "The higher a country's exposure to production complexity in its network of trade agreements, "
+        'the more likely it is to learn how to make new things and grow.'
+        '</div>'
+        '<div style="font-size:17px;color:#EAF1F7;margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
+        'Use FaDalgo to see the complexity exposure that countries gain from the trade agreements they '
+        'have signed, and how they could gain more by signing extra ones with further countries and '
+        'trading blocs.'
+        '</div>'
+        '<div style="font-size:17px;color:#EAF1F7;margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
+        'FaDalgo is an implementation of Fan et al.\'s 2025 paper <a href="https://www.sciencedirect.com/'
+        'science/article/pii/S1059056025000553#sec3" target="_blank" style="color:#4DD8E8;"><em>Does '
+        'centrality within trade agreements networks matter to economic complexity? The conditioning '
+        'effects of network structure</em></a>, which builds on the work of Cesar Hidalgo and colleagues '
+        'into economic complexity. The Fan et al. paper shows that countries gain complexity exposure '
+        'through being more central in their network of trade agreements, signing deeper agreements with '
+        'partners that have more domestic complexity, and prioritising agreements with partners that are '
+        'outside their immediate region and have dissimilar production profiles. Hausmann and Hidalgo '
+        '(2009) show in <a href="https://www.pnas.org/doi/10.1073/pnas.0900943106" target="_blank" '
+        'style="color:#4DD8E8;"><em>The building blocks of economic complexity</em></a> that greater '
+        'complexity in an economy is significantly linked to economic growth.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -1451,14 +1468,14 @@ def render_home():
             st.markdown(
                 f'<div style="font-size:15px;font-weight:700;color:{COLOR_CYAN};'
                 f'letter-spacing:.02em;margin:0 0 4px 2px;">'
-                f'Current trade agreement partners, add more</div>',
+                f'Trade agreements</div>',
                 unsafe_allow_html=True,
             )
             _grp_widget = st.multiselect(
-                "Current trade agreement partners, add more",
+                "Trade agreements",
                 options=_all_names,
                 default=st.session_state["country_group"],
-                placeholder="Select country…",
+                placeholder="Select additional countries to sign trade agreements with",
                 key="country_group_widget",
                 label_visibility="collapsed",
             )
@@ -1875,6 +1892,16 @@ def render_home():
             f'Select a country above to see recommended trade partners.</div>',
             unsafe_allow_html=True,
         )
+
+    # ── Backdrop image credit ───────────────────────────────────────────────
+    st.markdown(
+        '<div style="text-align:center;margin-top:24px;font-size:10px;color:rgba(255,255,255,0.35);">'
+        'Photo by <a href="https://unsplash.com/@visaxslr?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" '
+        'style="color:rgba(255,255,255,0.35);" target="_blank">Visax</a> on '
+        '<a href="https://unsplash.com/photos/a-black-background-with-a-wavy-pattern-FpkeKQlgJtI?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" '
+        'style="color:rgba(255,255,255,0.35);" target="_blank">Unsplash</a></div>',
+        unsafe_allow_html=True,
+    )
 
 def _unused():
     sel = st.session_state["country"]
