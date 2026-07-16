@@ -2,7 +2,7 @@
 
 FaDalgo is an implementation of Fan et al.'s 2025 paper Does centrality within trade agreements networks matter to economic complexity? The conditioning effects of network structure, which builds on the work of Cesar Hidalgo and colleagues into economic complexity. Hence 'Fa' and 'Dalgo'. 
 
-We know from the econonomic complexity literature that greater complexity is correllated with higher growth. The more that economic agents know about making a wide range of products, the stronger will be there ability to combine existing knowledge into new things, thereby increasing resilience and boosting growth.
+We know from the econonomic complexity literature that greater complexity is correllated with higher economic growth. The more that agents know about making a wide range of products, the stronger will be their ability to combine existing knowledge into new things, thereby increasing resilience and boosting growth.
 
 Fan etal extend the insight of Hidalgo and others to the effects of a country's position in a network of trade agreements on its ability to access growth-boosting complexity. The greater the production complexity held in the network, the more central that the country is in it, and deeper the agreements signed with complex partners, the more access that the country will have. More access should mean higher growth. 
 
