@@ -1,6 +1,6 @@
 """
-network_example.py — Trade Partner Intelligence
-================================================
+network_example.py — FaDalgo
+=============================
 A Streamlit app that allows the user to gauge the combination of a country's position
 in a network of trade agreements, and its access to economic complexity from across
 the network. 
@@ -26,18 +26,10 @@ import streamlit.components.v1 as components
 from PIL import Image
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE CONFIG
-# ══════════════════════════════════════════════════════════════════════════════
-
-st.set_page_config(
-    page_title="FaDalgo",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-# ══════════════════════════════════════════════════════════════════════════════
 # CONSTANTS
 # ══════════════════════════════════════════════════════════════════════════════
+
+APP_NAME = "FaDalgo"
 
 COLOR_GREEN  = "#00A651"
 COLOR_BLUE   = "#004B87"   # solid fills only (badges, active pills) — dark navy, white text on top
@@ -50,6 +42,16 @@ COLOR_TEAL   = "#85D6E9"   # sampled directly from the backdrop image's brightes
                             # trade-partners boxes, which were previously brand green
 
 PROJECT_ROOT = Path(__file__).parent
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE CONFIG
+# ══════════════════════════════════════════════════════════════════════════════
+
+st.set_page_config(
+    page_title=APP_NAME,
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 
 @st.cache_data(show_spinner=False)
@@ -1187,7 +1189,7 @@ def render_home():
     sel_partners = PARTNER_MAP.get(sel, set()) if sel else set()
 
     st.markdown(
-        '<div class="page-title">FaDalgo</div>',
+        f'<div class="page-title">{APP_NAME}</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -1196,12 +1198,12 @@ def render_home():
         'the more likely it is to learn how to make new things and grow.'
         '</div>'
         '<div style="font-size:17px;color:#EAF1F7;margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
-        'Use FaDalgo to see the complexity exposure that countries gain from the trade agreements they '
+        f'Use {APP_NAME} to see the complexity exposure that countries gain from the trade agreements they '
         'have signed, and how they could gain more by signing extra ones with further countries and '
         'trading blocs.'
         '</div>'
         '<div style="font-size:17px;color:#EAF1F7;margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
-        'FaDalgo is an implementation of Fan et al.\'s 2025 paper <a href="https://www.sciencedirect.com/'
+        f'{APP_NAME} is an implementation of Fan et al.\'s 2025 paper <a href="https://www.sciencedirect.com/'
         'science/article/pii/S1059056025000553#sec3" target="_blank" style="color:#4DD8E8;"><em>Does '
         'centrality within trade agreements networks matter to economic complexity? The conditioning '
         'effects of network structure</em></a>, which builds on the work of Cesar Hidalgo and colleagues '
@@ -1895,11 +1897,11 @@ def render_home():
 
     # ── Backdrop image credit ───────────────────────────────────────────────
     st.markdown(
-        '<div style="text-align:center;margin-top:24px;font-size:10px;color:rgba(255,255,255,0.35);">'
+        '<div style="text-align:center;margin-top:24px;font-size:10px;color:var(--text-muted);">'
         'Photo by <a href="https://unsplash.com/@visaxslr?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" '
-        'style="color:rgba(255,255,255,0.35);" target="_blank">Visax</a> on '
+        'style="color:var(--text-muted);" target="_blank">Visax</a> on '
         '<a href="https://unsplash.com/photos/a-black-background-with-a-wavy-pattern-FpkeKQlgJtI?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" '
-        'style="color:rgba(255,255,255,0.35);" target="_blank">Unsplash</a></div>',
+        'style="color:var(--text-muted);" target="_blank">Unsplash</a></div>',
         unsafe_allow_html=True,
     )
 

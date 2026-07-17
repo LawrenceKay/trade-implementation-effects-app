@@ -20,11 +20,12 @@ coding used by Fan etal (2025). Absolute depth values are therefore not the same
 Fan etal (2025), but the relative ordering persists. This does not affect the 
 centrality ranking. 
 
-Five types of centrality are computed to reflect the Fan et al (2025) approach and the 
-underlying literature from Paul Krugman. In short, countries are thought to have 'natural'
-trade partners which are their geographic neighbours, and for these to have similar production
-profiles. They are also divided into 'developed' and 'developing' groups. Partnering with non-natural 
-countries tends to raise complexity access, as does developing countries doing so with developed ones.
+Five types of centrality are computed to reflect the Fan et al (2025) H2/H3 hypotheses.
+In short, countries are thought to have 'natural' trade partners which are their geographic
+neighbours, and for these to have similar production profiles. They are also divided into
+'developed' and 'developing' groups. Fan et al (2025) find that partnering with non-natural
+countries tends to raise complexity access (H2), as does developing countries doing so with
+developed ones (H3).
 
 The centrality variants are as follows: 
   • overall_centrality  — all FTA partners
@@ -141,6 +142,102 @@ CEPII_ISO_ALIASES = {"ROU": "ROM", "COD": "ZAR"}
 # (2025), footnote 4, page 7 — see CLAUDE.md Section 5, "'Developed'/
 # 'developing' sub-network split (H3)"
 OIL_RICH_EXCLUDED = {"SAU", "KWT", "QAT", "OMN", "BHR"}
+
+# A WBID's Status can be "In Force" for an agreement as a whole (e.g. "EU -
+# Syria") while one member's own participation has since lapsed (e.g. every
+# EU FTA stopped covering the UK on 31-Dec-2020, at Brexit). WB DTA 2.0
+# doesn't record that via Status — it records it by simply not emitting
+# further per-(iso1, iso2, WBID) rows in Bilateral Information once that
+# country's coverage ends (verified: UK-Syria and UK-Armenia rows stop at
+# 2020, while France-Syria and Germany-Armenia rows for the same WBIDs
+# continue to the sheet's latest year). RECENCY_BUFFER_YEARS tolerates this
+# many years of ordinary reporting lag in the newest data before treating an
+# otherwise-active pair as lapsed — see get_valid_pairs.
+RECENCY_BUFFER_YEARS = 1
+
+# WB DTA 2.0 hasn't finished provision-level depth coding for these UK
+# post-Brexit continuity agreements — every agree_<WBID> cell is blank in the
+# STATA sheet, so their raw computed depth is 0, which without an explicit
+# override would silently drop them from the network graph entirely (see
+# Extensionslimitations.md, "Zero-depth continuity agreements", for the full
+# rationale, verification, and caveats around this proxy). Since a UK
+# continuity agreement was negotiated to replicate the EU agreement it
+# succeeded, that EU agreement's own (fully-coded) depth is used as an
+# explicit, labelled stand-in. Matched by exact partner name against the
+# equivalent "EU - <partner>" WBID; verified against WB DTA 2.0 on
+# 2026-07-17. {UK WBID: EU-precursor WBID to borrow depth from}.
+UK_CONTINUITY_DEPTH_PROXY_WBID = {
+    354: 229,  # United Kingdom - Colombia, Ecuador and Peru   <- EU - Colombia, Ecuador and Peru
+    355: 154,  # United Kingdom - CARIFORUM States              <- EU - CARIFORUM States
+    356: 230,  # United Kingdom - Central America               <- EU - Central America
+    357: 87,   # United Kingdom - Chile                         <- EU - Chile
+    358: 157,  # United Kingdom - Côte d'Ivoire                 <- EU - Côte d'Ivoire
+    359: 207,  # United Kingdom - Eastern and Southern Africa States <- EU - same
+    360: 34,   # United Kingdom - Faroe Islands                 <- EU - Faroe Islands
+    361: 251,  # United Kingdom - Georgia                       <- EU - Georgia
+    364: 76,   # United Kingdom - Jordan                        <- EU - Jordan
+    366: 79,   # United Kingdom - Lebanon                       <- EU - Lebanon
+    367: 55,   # United Kingdom - Morocco                       <- EU - Morocco
+    368: 202,  # United Kingdom - Pacific States                <- EU - Pacific States
+    369: 36,   # United Kingdom - Palestine                     <- EU - Palestine
+    371: 289,  # United Kingdom - SACU and Mozambique           <- EU - SADC (covers SACU members + Mozambique)
+    373: 40,   # United Kingdom - Tunisia                       <- EU - Tunisia
+    374: 250,  # United Kingdom - Ukraine                       <- EU - Ukraine
+    375: 121,  # United Kingdom - Albania                       <- EU - Albania
+    376: 173,  # United Kingdom - Cameroon                      <- EU - Cameroon
+    377: 96,   # United Kingdom - Egypt                         <- EU - Egypt
+    378: 290,  # United Kingdom - Ghana                         <- EU - Ghana
+    380: 248,  # United Kingdom - Moldova, Republic of          <- EU - Moldova, Republic of
+    381: 70,   # United Kingdom - North Macedonia               <- EU - North Macedonia
+    382: 184,  # United Kingdom - Serbia                        <- EU - Serbia
+    383: 287,  # United Kingdom - Singapore                     <- EU - Singapore
+    385: 288,  # United Kingdom - Viet Nam                      <- EU - Viet Nam
+    388: 352,  # United Kingdom - Pacific States - Accession of Samoa <- EU - same
+    389: 353,  # United Kingdom - Pacific States - Accession of Solomon Islands <- EU - same
+}
+
+# United Kingdom - Iceland, Liechtenstein and Norway (WBID 392) bundles three
+# EFTA states under one WBID, so unlike the table above it has no single EU
+# precursor — Iceland and Norway each have their own EU deal, and
+# Liechtenstein's is shared with Switzerland. Depth is assigned per partner
+# country rather than uniformly across the WBID.
+UK_EFTA_BUNDLE_WBID = 392
+UK_EFTA_BUNDLE_DEPTH_PROXY_ISO = {
+    "ISL": 67,  # <- EU - Iceland (WBID 7)
+    "NOR": 68,  # <- EU - Norway (WBID 8)
+    "LIE": 69,  # <- EU - Switzerland - Liechtenstein (WBID 6)
+}
+
+# United Kingdom - Kenya (387) and United Kingdom - Kosovo (365): no EU
+# precursor exists anywhere in WB DTA 2.0 for either partner (no "EU -
+# Kenya"/"EU - EAC" or "EU - Kosovo" WBID is coded in this dataset at all).
+# Last-resort proxy: the UK's own average depth across its other valid
+# agreements — computed in load_wb_dta, after the overrides above are
+# applied, excluding these two WBIDs themselves.
+UK_NO_PRECURSOR_WBIDS = {365, 387}
+
+# Zero-depth agreements with no Brexit connection at all (2026-07-17) — see
+# Extensionslimitations.md, "Zero-depth agreements unrelated to Brexit", for
+# the full rationale and caveats. None of these is a rollover of an
+# already-coded agreement, so there's no single precursor WBID to borrow
+# from; instead, each pair is assigned the lowest depth score found across
+# either of its two countries' OTHER real bilateral relationships — a
+# deliberately conservative proxy (see get_lowest_of_two_depth_proxies).
+PTN_WBID = 317                    # Protocol on Trade Negotiations (1971)
+PACER_PLUS_WBID = 329             # Pacific Agreement on Closer Economic Relations Plus
+MOROCCO_UAE_WBID = 328
+INDONESIA_PAKISTAN_WBID = 344
+LOWEST_OF_TWO_PROXY_WBIDS = {PTN_WBID, PACER_PLUS_WBID, MOROCCO_UAE_WBID, INDONESIA_PAKISTAN_WBID}
+
+# Mexico - Cuba (310) and Mexico - Paraguay (334): assigned Mexico's own
+# average depth across its other Latin American Integration Association
+# (LAIA/ALADI) partners — Argentina, Bolivia, Brazil, Chile, Colombia,
+# Ecuador, Panama, Peru, Uruguay, Venezuela (LAIA's membership minus Mexico,
+# Cuba, and Paraguay themselves).
+MEXICO_LAIA_PROXY_WBIDS = {310, 334}
+LAIA_MEMBERS_EXCL_MEXICO_CUBA_PARAGUAY = {
+    "ARG", "BOL", "BRA", "CHL", "COL", "ECU", "PAN", "PER", "URY", "VEN"
+}
 
 # ── World Bank regional classification ────────────────────────────────────────
 # Used to split natural (intra-regional) vs non-natural (inter-regional) networks.
@@ -332,6 +429,75 @@ def get_valid_wbids(agreements, year_filter=None):
     return set(agreements.loc[mask, "WBID"])
 
 
+def get_valid_pairs(bilateral, year_filter=None):
+    """
+    Determine which (iso1, iso2, WBID) triples are actually covered as of the
+    reference year, using Bilateral Information's own year panel rather than
+    Agreements' Status field — see RECENCY_BUFFER_YEARS for why Status alone
+    is not enough (e.g. "EU - Syria" stays "In Force" after Brexit even
+    though the UK's own coverage lapsed 31-Dec-2020).
+
+    A triple is valid if the reference year falls within [pair_min_year,
+    pair_max_year + RECENCY_BUFFER_YEARS], where pair_min_year/pair_max_year
+    are that exact triple's earliest/latest recorded year in Bilateral
+    Information (accession and lapse are both visible this way — confirmed
+    against known cases: UK-Syria/UK-Armenia rows stop at 2020, Samoa's
+    EU-Pacific-States rows only start at 2018, its accession year).
+
+    Default (year_filter=None) — live/current-state snapshot: reference year
+    is the dataset's own latest year (bilateral["year"].max()).
+
+    --year mode — historical snapshot: reference year is year_filter itself,
+    so a pair only counts for a given historical year if it was actually
+    covered then (e.g. UK-Syria is valid at year_filter=2015, not at 2022).
+
+    Returns a DataFrame with columns iso1, iso2, WBID — one row per valid
+    triple, suitable for an inner-join filter on the bilateral panel.
+    """
+    reference_year = year_filter if year_filter is not None else bilateral["year"].max()
+    pair_span = bilateral.groupby(["iso1", "iso2", "WBID"])["year"].agg(["min", "max"])
+    pair_span.columns = ["pair_min_year", "pair_max_year"]
+    pair_span = pair_span.reset_index()
+    covers_reference = (
+        (pair_span["pair_min_year"] <= reference_year)
+        & (pair_span["pair_max_year"] >= reference_year - RECENCY_BUFFER_YEARS)
+    )
+    return pair_span.loc[covers_reference, ["iso1", "iso2", "WBID"]]
+
+
+def build_depth_lookup(bilateral):
+    """
+    Resolve bilateral (with a populated "depth" column) into dict
+    {(iso1, iso2) sorted: depth}, taking the max depth where more than one
+    valid agreement connects the same pair. Factored out of load_wb_dta so it
+    can be run twice: once to get each country's real (already-resolved)
+    depth with its other partners before the lowest-of-two/average proxies
+    below are computed, and once more, finally, after they're written in.
+    """
+    lookup = {}
+    for _, row in bilateral.iterrows():
+        key = tuple(sorted([str(row["iso1"]).strip().upper(),
+                            str(row["iso2"]).strip().upper()]))
+        depth = float(row["depth"])
+        if depth > lookup.get(key, 0):
+            lookup[key] = depth
+    return lookup
+
+
+def get_lowest_of_two_depth_proxy(lookup, iso_a, iso_b):
+    """
+    The lowest depth score found across either iso_a's or iso_b's other real
+    bilateral relationships in `lookup` — the proxy used for PTN, PACER Plus,
+    Morocco-UAE, and Indonesia-Pakistan (see LOWEST_OF_TWO_PROXY_WBIDS).
+    `lookup` should be a first-pass depth_lookup that does not yet include
+    the pair being proxied, so its own (still-zero) depth can't contaminate
+    the pool. Returns None if neither country has any other real relationship
+    in `lookup` (not expected in practice, but handled rather than crashing).
+    """
+    pool = [depth for (a, b), depth in lookup.items() if iso_a in (a, b) or iso_b in (a, b)]
+    return min(pool) if pool else None
+
+
 def load_wb_dta(year_filter=None):
     """
     Load WB DTA 2.0 as the sole source of network topology, edge depth, and
@@ -339,7 +505,16 @@ def load_wb_dta(year_filter=None):
     source mismatch") for why DESTA was retired from this role. Topology and
     depth now come from the exact same Status/year-filtered dataset, so
     (unlike the old DESTA+DTA-2.0 split) every edge has a real depth by
-    construction — no fallback needed.
+    construction — with one documented exception: a handful of recent UK
+    continuity agreements have no provision-level coding in WB DTA 2.0 yet
+    (raw depth 0), so their edge would otherwise silently vanish from the
+    network graph. These get an explicit depth proxy applied here — see
+    UK_CONTINUITY_DEPTH_PROXY_WBID, UK_EFTA_BUNDLE_DEPTH_PROXY_ISO,
+    UK_NO_PRECURSOR_WBIDS, and Extensionslimitations.md, "Zero-depth
+    continuity agreements". A handful of zero-depth agreements unconnected to
+    Brexit get a proxy too — see LOWEST_OF_TWO_PROXY_WBIDS,
+    MEXICO_LAIA_PROXY_WBIDS, and Extensionslimitations.md, "Zero-depth
+    agreements unrelated to Brexit".
 
     Reads the STATA sheet, a provision (row) x agreement (column, `agree_N`)
     matrix where `agree_N` corresponds to WBID=N (verified 1:1, both run 1-400).
@@ -350,10 +525,13 @@ def load_wb_dta(year_filter=None):
 
     Joins the resulting per-agreement depth to the Bilateral Information sheet
     (iso1, iso2, WBID panel), after filtering to valid WBIDs (see
-    get_valid_wbids), to produce a per-country-pair depth lookup — this
-    lookup IS the network's edge set, not just a weight overlay — and
-    separately a per-country lookup of avg/max provision depth across all of
-    that country's own (valid) agreements.
+    get_valid_wbids) and then to valid pairs within those WBIDs (see
+    get_valid_pairs — drops pairs whose own bloc-membership coverage has
+    lapsed even though the agreement itself is still "In Force"), to produce
+    a per-country-pair depth lookup — this lookup IS the network's edge set,
+    not just a weight overlay — and separately a per-country lookup of
+    avg/max provision depth across all of that country's own (valid)
+    agreements.
 
     Returns (depth_lookup, country_depth_stats, entry_year_lookup,
     pair_agreements) where depth_lookup is dict {(iso1, iso2): depth_score}
@@ -381,6 +559,15 @@ def load_wb_dta(year_filter=None):
         print(f"  Live mode: agreements currently in force: {len(valid_wbids)}")
     bilateral = bilateral[bilateral["WBID"].isin(valid_wbids)].copy()
 
+    # Drop stale bloc-membership pairs (see get_valid_pairs / RECENCY_BUFFER_YEARS)
+    # — a WBID passing the Status filter above doesn't mean every pair under it
+    # is still covered (e.g. UK-Syria, UK-Armenia lapsed at Brexit while
+    # "EU - Syria"/"EU - Armenia" remain "In Force" for the EU and the partner).
+    n_before = len(bilateral)
+    valid_pairs = get_valid_pairs(bilateral, year_filter)
+    bilateral = bilateral.merge(valid_pairs, on=["iso1", "iso2", "WBID"], how="inner")
+    print(f"  Stale bloc-membership pairs dropped: {n_before - len(bilateral):,} rows")
+
     entry_g = pd.to_datetime(agreements["Date of Entry into Force (G)"], errors="coerce")
     entry_year_lookup = {
         int(wbid): int(yr) for wbid, yr in zip(agreements["WBID"], entry_g.dt.year) if pd.notna(yr)
@@ -402,6 +589,13 @@ def load_wb_dta(year_filter=None):
     binary_provisions = stata.loc[binary_mask, agree_cols]
     depth_per_wbid = (binary_provisions == 1).sum(axis=0)  # sum down rows, per agreement column
     depth_per_wbid.index = depth_per_wbid.index.str.replace("agree_", "", regex=False).astype(int)
+
+    # Zero-depth UK continuity agreements: borrow depth from the EU precursor
+    # they replicate — see UK_CONTINUITY_DEPTH_PROXY_WBID and
+    # Extensionslimitations.md, "Zero-depth continuity agreements".
+    for wbid, proxy_wbid in UK_CONTINUITY_DEPTH_PROXY_WBID.items():
+        depth_per_wbid[wbid] = depth_per_wbid[proxy_wbid]
+
     depth_scores = depth_per_wbid.rename("depth").rename_axis("WBID").reset_index()
     print(f"  Depth scores: {len(depth_scores)} agreements, "
           f"max={depth_scores['depth'].max()}, mean={depth_scores['depth'].mean():.1f}")
@@ -409,15 +603,78 @@ def load_wb_dta(year_filter=None):
     # Join depth to bilateral country-pair data
     bilateral = bilateral.merge(depth_scores, on="WBID", how="left")
     bilateral = bilateral.dropna(subset=["depth"])
+    # float, not int: the Kenya/Kosovo proxy below is a fractional average
+    bilateral["depth"] = bilateral["depth"].astype(float)
 
-    # Build lookup keyed on sorted (iso1, iso2) tuple; take max depth per pair
-    lookup = {}
-    for _, row in bilateral.iterrows():
-        key = tuple(sorted([str(row["iso1"]).strip().upper(),
-                            str(row["iso2"]).strip().upper()]))
-        depth = float(row["depth"])
-        if depth > lookup.get(key, 0):
-            lookup[key] = depth
+    # UK - Iceland, Liechtenstein and Norway (WBID 392): per-partner proxy,
+    # not a single WBID-level value — see UK_EFTA_BUNDLE_DEPTH_PROXY_ISO.
+    bundle_mask = bilateral["WBID"] == UK_EFTA_BUNDLE_WBID
+    if bundle_mask.any():
+        partner = bilateral.loc[bundle_mask, ["iso1", "iso2"]].apply(
+            lambda r: r["iso2"] if r["iso1"] == "GBR" else r["iso1"], axis=1
+        )
+        bilateral.loc[bundle_mask, "depth"] = partner.map(UK_EFTA_BUNDLE_DEPTH_PROXY_ISO).values
+
+    # United Kingdom - Kenya / United Kingdom - Kosovo: no EU precursor exists
+    # for either, so use the UK's own average depth across its other valid
+    # agreements (one row per distinct WBID, computed after the overrides
+    # above so the EFTA-bundle proxies count too) — see UK_NO_PRECURSOR_WBIDS.
+    uk_wbids = bilateral.loc[
+        ((bilateral["iso1"] == "GBR") | (bilateral["iso2"] == "GBR"))
+        & (~bilateral["WBID"].isin(UK_NO_PRECURSOR_WBIDS)),
+        ["WBID", "depth"],
+    ].drop_duplicates(subset=["WBID"])
+    uk_avg_depth = uk_wbids["depth"].mean()
+    bilateral.loc[bilateral["WBID"].isin(UK_NO_PRECURSOR_WBIDS), "depth"] = uk_avg_depth
+    print(f"  UK average depth across {len(uk_wbids)} other valid agreements: "
+          f"{uk_avg_depth:.1f} — assigned to Kenya/Kosovo (no EU precursor exists)")
+
+    # First-pass lookup: every WBID handled above is now real (proxied or
+    # genuinely coded), but the six zero-depth agreements below are still 0,
+    # so they're naturally absent here — exactly the "other real bilateral
+    # relationships" pool the proxies below need, with no circularity.
+    first_pass_lookup = build_depth_lookup(bilateral)
+
+    # Zero-depth agreements with no Brexit connection — see
+    # LOWEST_OF_TWO_PROXY_WBIDS, get_lowest_of_two_depth_proxy, and
+    # Extensionslimitations.md, "Zero-depth agreements unrelated to Brexit".
+    for wbid in LOWEST_OF_TWO_PROXY_WBIDS:
+        wbid_mask = bilateral["WBID"] == wbid
+        pairs = bilateral.loc[wbid_mask, ["iso1", "iso2"]].apply(
+            lambda r: tuple(sorted([str(r["iso1"]).upper(), str(r["iso2"]).upper()])), axis=1
+        ).unique()
+        n_proxied = 0
+        for iso_a, iso_b in pairs:
+            proxy = get_lowest_of_two_depth_proxy(first_pass_lookup, iso_a, iso_b)
+            if proxy is None:
+                print(f"  WARNING: no other real relationship found for {iso_a}/{iso_b} "
+                      f"(WBID {wbid}) — left at depth 0")
+                continue
+            pair_mask = wbid_mask & (
+                ((bilateral["iso1"] == iso_a) & (bilateral["iso2"] == iso_b))
+                | ((bilateral["iso1"] == iso_b) & (bilateral["iso2"] == iso_a))
+            )
+            bilateral.loc[pair_mask, "depth"] = proxy
+            n_proxied += 1
+        print(f"  WBID {wbid}: lowest-of-two-countries proxy assigned to {n_proxied}/{len(pairs)} pairs")
+
+    # Mexico - Cuba / Mexico - Paraguay: Mexico's own average depth across its
+    # other LAIA partners — see MEXICO_LAIA_PROXY_WBIDS.
+    laia_depths = [
+        depth for (a, b), depth in first_pass_lookup.items()
+        if "MEX" in (a, b)
+        and (b if a == "MEX" else a) in LAIA_MEMBERS_EXCL_MEXICO_CUBA_PARAGUAY
+    ]
+    mex_laia_avg = sum(laia_depths) / len(laia_depths) if laia_depths else None
+    if mex_laia_avg is not None:
+        bilateral.loc[bilateral["WBID"].isin(MEXICO_LAIA_PROXY_WBIDS), "depth"] = mex_laia_avg
+    print(f"  Mexico's average depth across {len(laia_depths)} other LAIA partners: "
+          f"{mex_laia_avg:.1f} — assigned to Mexico-Cuba/Mexico-Paraguay")
+
+    # Final lookup, built after every proxy above has been written into
+    # bilateral's "depth" column — takes the max depth per pair across all
+    # valid agreements, exactly as before.
+    lookup = build_depth_lookup(bilateral)
 
     print(f"  Network edges (unique country pairs, valid agreements only): {len(lookup):,}")
 
