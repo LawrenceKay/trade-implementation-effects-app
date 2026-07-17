@@ -143,6 +143,15 @@ CEPII_ISO_ALIASES = {"ROU": "ROM", "COD": "ZAR"}
 # 'developing' sub-network split (H3)"
 OIL_RICH_EXCLUDED = {"SAU", "KWT", "QAT", "OMN", "BHR"}
 
+# Historical ISO codes for states that no longer exist, present in WB DTA
+# 2.0's Bilateral Information panel as a legacy artefact of an old
+# agreement's row history but not a country the app should ever surface.
+# Currently just Yugoslavia (YUG), which appears solely under the Protocol
+# on Trade Negotiations (WBID 317, entered into force 1973) — excluded from
+# `bilateral` before any other processing so it can't appear as a node,
+# accrue agreement stats, or contribute to another country's depth-proxy pool.
+HISTORICAL_ISO_EXCLUDE = {"YUG"}
+
 # A WBID's Status can be "In Force" for an agreement as a whole (e.g. "EU -
 # Syria") while one member's own participation has since lapsed (e.g. every
 # EU FTA stopped covering the UK on 31-Dec-2020, at Brexit). WB DTA 2.0
@@ -551,6 +560,16 @@ def load_wb_dta(year_filter=None):
     agreements = pd.read_excel(DTA_EXCEL_PATH, sheet_name="Agreements").rename(columns={"WB ID": "WBID"})
     stata      = pd.read_excel(DTA_EXCEL_PATH, sheet_name="STATA")
     bilateral  = pd.read_excel(DTA_EXCEL_PATH, sheet_name="Bilateral Information")
+
+    # Drop historical/defunct-state codes (see HISTORICAL_ISO_EXCLUDE) before
+    # anything else touches bilateral, so they can't become a node, accrue
+    # agreement stats, or feed into another country's depth-proxy pool.
+    n_before_historical = len(bilateral)
+    bilateral = bilateral[
+        ~bilateral["iso1"].isin(HISTORICAL_ISO_EXCLUDE) & ~bilateral["iso2"].isin(HISTORICAL_ISO_EXCLUDE)
+    ].copy()
+    print(f"  Historical/defunct-state rows dropped: {n_before_historical - len(bilateral):,} "
+          f"({', '.join(sorted(HISTORICAL_ISO_EXCLUDE))})")
 
     valid_wbids = get_valid_wbids(agreements, year_filter)
     if year_filter:

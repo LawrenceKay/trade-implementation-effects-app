@@ -103,10 +103,12 @@ conservative — again, these are explicit, labelled stand-ins, not WB DTA 2.0's
 agreements.
 
 **Protocol on Trade Negotiations (PTN), Morocco–United Arab Emirates, Indonesia–Pakistan — "lowest of the two
-countries" method.** PTN is a 1971 GATT-era plurilateral preference scheme among 16 developing countries
+countries" method.** PTN is a 1971 GATT-era plurilateral preference scheme among 15 developing countries
 (Bangladesh, Brazil, Chile, Egypt, Israel, South Korea, Mexico, Pakistan, Peru, Philippines, Paraguay,
-Serbia, Tunisia, Türkiye, Uruguay, and the historical Yugoslavia code still present in WB DTA 2.0's panel),
-covering 120 bilateral pairs. For each pair, and for the two standalone bilaterals (Morocco–UAE,
+Serbia, Tunisia, Türkiye, Uruguay), covering 105 bilateral pairs — WB DTA 2.0's Bilateral Information panel
+also carries a historical "Yugoslavia" (YUG) code under this WBID, a defunct state excluded from the app
+entirely (see "Filtered: historical/defunct-state codes" below) rather than treated as a 16th party. For each
+pair, and for the two standalone bilaterals (Morocco–UAE,
 Indonesia–Pakistan), **the assigned depth is the lowest depth score found across either of the two
 countries' other real bilateral relationships** — i.e. for pair (A, B), the minimum value in the pooled set
 of A's other agreement depths and B's other agreement depths. This is deliberately the *lowest* available
@@ -140,6 +142,18 @@ partner," per instruction, not the counterpart's own portfolio.
 stop a real, in-force agreement from silently vanishing from the network graph — none of it is sourced,
 provision-level WB DTA 2.0 coding for the specific agreement it's attached to. If WB DTA 2.0 later codes any
 of these agreements directly, that coding should replace the corresponding proxy here.
+
+### Filtered: historical/defunct-state codes (2026-07-17)
+
+While computing the PTN proxy above, "Yugoslavia" (ISO code YUG) turned up as a 211th network node — a state
+that hasn't existed since the 1990s, present in WB DTA 2.0's Bilateral Information panel purely as a legacy
+row-history artefact under the Protocol on Trade Negotiations (WBID 317, entered into force 1973), with no
+other agreement referencing it anywhere in the dataset. It's excluded outright in `centrality_pipeline.py`
+(`HISTORICAL_ISO_EXCLUDE`), dropped from `bilateral` before any other processing, so it can't appear as a
+selectable country, accrue agreement stats, or feed into another country's depth-proxy pool (it was one of
+PTN's original 16 signatories per WB DTA 2.0's historical panel, brought down to the 15 real, current
+countries listed above once removed). If another defunct-state code is ever found elsewhere in the dataset,
+add it to the same set.
 
 ## Possible extensions
 
