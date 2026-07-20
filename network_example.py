@@ -1318,9 +1318,9 @@ def render_home():
         _cmax_r     = max(_all_cent_r) if _all_cent_r else 1.0
         for _iso in _non_partners:
             _name = COUNTRY_LOOKUP.get(_iso, {}).get("name", _iso)
-            _n_agr = len(AGREEMENTS_MAP.get(_iso, []))
-            if _n_agr:
-                _depth_cands.append((_name, _n_agr))
+            _ad = _avg_enforceable_index.get(_iso)
+            if _ad:
+                _depth_cands.append((_name, round(min(_ad / DEPTH_MAX * 100, 100), 1)))
             _c = _centrality_index.get(_iso)
             if _c is not None:
                 _cent_cands.append((_name, round(_c / _cmax_r * 100, 1)))
@@ -1862,7 +1862,7 @@ def render_home():
             )
 
         _depth_rows = "".join(
-            _rec_row(n, f"{v} agreements", COLOR_TEAL)
+            _rec_row(n, f"{v} / 100", COLOR_TEAL)
             for n, v in _depth_cands[:7]
         ) or '<div style="padding:12px;color:#EAF1F7;font-size:17px;">No data.</div>'
 
@@ -1880,8 +1880,8 @@ def render_home():
             f'<div style="margin-bottom:8px;font-size:17px;font-weight:700;color:{COLOR_TEAL};'
             f'letter-spacing:.02em;">Recommended trade partners</div>'
             f'<div style="display:flex;gap:12px;">'
-            f'{_rec_panel(f"{sel_name} could increase the depth of its agreements with the following countries", "Non-partners ranked by FTA track record (agreement count proxy)", _depth_rows)}'
             f'{_rec_panel(f"{sel_name} could increase its network centrality with the following countries", "Non-partners whose centrality would most lift your own", _cent_rows)}'
+            f'{_rec_panel(f"{sel_name} could increase the depth of its agreements with the following countries", "Non-partners with the highest average agreement depth (same 0-100 scale as the score above)", _depth_rows)}'
             f'{_rec_panel(f"{sel_name} could increase its economic complexity exposure with the following countries", "Non-partners with highest ECI — Harvard Atlas 2012", _eci_rows)}'
             f'</div>',
             unsafe_allow_html=True,
