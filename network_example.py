@@ -1214,6 +1214,11 @@ def render_home():
         '(2009) show in <a href="https://www.pnas.org/doi/10.1073/pnas.0900943106" target="_blank" '
         'style="color:#4DD8E8;"><em>The building blocks of economic complexity</em></a> that greater '
         'complexity in an economy is significantly linked to economic growth.'
+        '</div>'
+        '<div style="font-size:17px;color:#EAF1F7;margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.5);">'
+        'Trade agreements data is taken from the World Bank\'s <a href="https://datatopics.worldbank.org/dta/'
+        'table.html" target="_blank" style="color:#4DD8E8;">Deep Trade Agreements database</a> and is true '
+        'to 2023. Users will need to add agreements signed and implemented afterwards.'
         '</div>',
         unsafe_allow_html=True,
     )
